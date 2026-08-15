@@ -1,0 +1,213 @@
+name: Shamsa • Cloud Build, Verify & Release
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      release_channel:
+        description: Release channel
+        required: true
+        default: auto
+        type: choice
+        options: [auto, stable, beta]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shamsa-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: '21'
+  ANDROID_API: '36'
+
+jobs:
+  build:
+    name: Verify + signed release (100% GitHub runner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-${ANDROID_API}" "build-tools;36.0.0" "platform-tools"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+          cache-read-only: false
+
+      - name: Compute monotonic version
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN="${GITHUB_RUN_NUMBER}"
+          ATTEMPT="${GITHUB_RUN_ATTEMPT}"
+          VERSION_CODE=$((1000000 + RUN * 10 + ATTEMPT))
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION_NAME="${GITHUB_REF_NAME#v}"
+          else
+            VERSION_NAME="1.0.${RUN}"
+          fi
+          echo "SHAMSA_VERSION_CODE=${VERSION_CODE}" >> "$GITHUB_ENV"
+          echo "SHAMSA_VERSION_NAME=${VERSION_NAME}" >> "$GITHUB_ENV"
+          echo "Version ${VERSION_NAME} (${VERSION_CODE})"
+
+      - name: Prepare persistent release signing identity in the cloud
+        id: signing
+        shell: bash
+        env:
+          SIGNING_MASTER: ${{ secrets.SHAMSA_SIGNING_MASTER }}
+        run: |
+          set -euo pipefail
+          test -n "$SIGNING_MASTER" || {
+            echo "::error::Missing SHAMSA_SIGNING_MASTER repository secret. Re-run the cloud deployer once."
+            exit 2
+          }
+
+          SIGN_DIR=".github/signing"
+          ENC_FILE="$SIGN_DIR/shamsa-release.jks.enc"
+          SHA_FILE="$SIGN_DIR/release-cert-sha1.txt"
+          KS="$RUNNER_TEMP/shamsa-release.jks"
+          PASS_FILE="$RUNNER_TEMP/shamsa-signing-master.txt"
+          mkdir -p "$SIGN_DIR"
+          umask 077
+          printf '%s' "$SIGNING_MASTER" > "$PASS_FILE"
+
+          # Passwords are derived inside the runner and are never stored in the repository.
+          STORE_PASSWORD="$(printf 'store:%s' "$SIGNING_MASTER" | sha256sum | awk '{print substr($1,1,32)}')"
+          KEY_PASSWORD="$(printf 'key:%s' "$SIGNING_MASTER" | sha256sum | awk '{print substr($1,1,32)}')"
+          KEY_ALIAS="shamsa"
+          CREATED=0
+
+          if [[ -s "$ENC_FILE" ]]; then
+            echo "Restoring encrypted release keystore from repository..."
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 250000 \
+              -in "$ENC_FILE" -out "$KS" -pass file:"$PASS_FILE"
+          else
+            if [[ "${GITHUB_REF_TYPE}" != "branch" || "${GITHUB_REF_NAME}" != "main" ]]; then
+              echo "::error::Release signing identity is not initialized yet. Run the main-branch workflow once first."
+              exit 3
+            fi
+            echo "Creating the Android release key on the GitHub-hosted runner..."
+            keytool -genkeypair -v \
+              -keystore "$KS" -storetype JKS \
+              -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" \
+              -alias "$KEY_ALIAS" -keyalg RSA -keysize 3072 -validity 10000 \
+              -dname "CN=Shamsa Release, OU=Android, O=Shamsa, L=Cloud, ST=Cloud, C=TR" \
+              -noprompt >/dev/null
+
+            openssl enc -aes-256-cbc -salt -pbkdf2 -iter 250000 \
+              -in "$KS" -out "$ENC_FILE" -pass file:"$PASS_FILE"
+            CREATED=1
+          fi
+
+          CERT_SHA1="$(keytool -list -v -keystore "$KS" -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" \
+            | awk '/SHA1:/{print $2; exit}')"
+          test -n "$CERT_SHA1" || { echo "::error::Unable to read release certificate SHA-1"; exit 4; }
+          printf '%s\n' "$CERT_SHA1" > "$SHA_FILE"
+
+          {
+            echo "SHAMSA_KEYSTORE_PATH=$KS"
+            echo "SHAMSA_KEYSTORE_PASSWORD=$STORE_PASSWORD"
+            echo "SHAMSA_KEY_ALIAS=$KEY_ALIAS"
+            echo "SHAMSA_KEY_PASSWORD=$KEY_PASSWORD"
+            echo "SHAMSA_RELEASE_SHA1=$CERT_SHA1"
+          } >> "$GITHUB_ENV"
+
+          echo "release_sha1=$CERT_SHA1" >> "$GITHUB_OUTPUT"
+          echo "### Android release certificate" >> "$GITHUB_STEP_SUMMARY"
+          echo "SHA-1: \`$CERT_SHA1\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Use this SHA-1 with package \`com.marble.shamsa\` for the Google Drive Android OAuth client." >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$CREATED" == "1" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add "$ENC_FILE" "$SHA_FILE"
+            git commit -m "chore: persist encrypted release signing identity [skip ci]"
+            git push origin HEAD:main
+            echo "Encrypted signing identity persisted on main. The wrapping secret remains only in GitHub Secrets."
+          fi
+
+          rm -f "$PASS_FILE"
+
+      - name: Unit tests
+        run: gradle --no-daemon :app:testDebugUnitTest
+
+      - name: Android lint
+        run: gradle --no-daemon :app:lintRelease
+
+      - name: Build signed APKs and AAB
+        run: gradle --no-daemon :app:assembleRelease :app:bundleRelease
+
+      - name: Verify APK signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          test -x "$APKSIGNER"
+          while IFS= read -r -d '' apk; do
+            "$APKSIGNER" verify --verbose --print-certs "$apk"
+          done < <(find app/build/outputs/apk/release -type f -name '*.apk' -print0)
+
+      - name: Collect deliverables
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          find app/build/outputs/apk/release -type f -name '*.apk' -print0 | while IFS= read -r -d '' f; do
+            base="$(basename "$f")"
+            cp "$f" "dist/Shamsa-${SHAMSA_VERSION_NAME}-${base#app-}"
+          done
+          cp app/build/outputs/bundle/release/app-release.aab "dist/Shamsa-${SHAMSA_VERSION_NAME}.aab"
+          printf '%s\n' "$SHAMSA_RELEASE_SHA1" > "dist/RELEASE-CERT-SHA1.txt"
+          (cd dist && sha256sum * > SHA256SUMS.txt)
+          git archive --format=zip --output="dist/Shamsa-${SHAMSA_VERSION_NAME}-source.zip" HEAD
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Shamsa-${{ env.SHAMSA_VERSION_NAME }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub release for main/tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v${SHAMSA_VERSION_NAME}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            channel="${{ github.event.inputs.release_channel || 'auto' }}"
+            prerelease=""
+            if [[ "$channel" == "beta" || ( "$channel" == "auto" && "${GITHUB_REF_TYPE}" != "tag" ) ]]; then
+              prerelease="--prerelease"
+            fi
+            gh release create "$TAG" dist/* \
+              --title "Shamsa ${SHAMSA_VERSION_NAME}" \
+              --generate-notes $prerelease
+          fi

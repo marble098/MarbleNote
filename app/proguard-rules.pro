@@ -1,0 +1,4 @@
+-keepattributes *Annotation*
+-keep class dagger.hilt.** { *; }
+-dontwarn org.conscrypt.**
+-dontwarn javax.annotation.**
