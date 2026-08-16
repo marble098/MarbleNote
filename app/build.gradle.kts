@@ -17,12 +17,15 @@ android {
         applicationId = "com.marble.shamsa"
         minSdk = 26
         targetSdk = 36
-        versionCode = (System.getenv("SHAMSA_VERSION_CODE") ?: "1000002").toInt()
-        versionName = System.getenv("SHAMSA_VERSION_NAME") ?: "1.0.2"
+        versionCode = (System.getenv("SHAMSA_VERSION_CODE") ?: "1000003").toInt()
+        versionName = System.getenv("SHAMSA_VERSION_NAME") ?: "1.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        resourceConfigurations += listOf("en", "fa")
         vectorDrawables.useSupportLibrary = true
+    }
+
+    androidResources {
+        localeFilters += listOf("en", "fa")
     }
 
     signingConfigs {
@@ -117,4 +120,9 @@ dependencies {
     implementation(libs.google.play.services.auth)
 
     testImplementation(kotlin("test"))
+}
+
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }

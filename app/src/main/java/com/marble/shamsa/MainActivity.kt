@@ -2,9 +2,9 @@ package com.marble.shamsa
 
 import android.Manifest
 import android.app.Activity
-import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,7 +36,9 @@ class MainActivity : AppCompatActivity() {
             val settings by vm.settings.collectAsStateWithLifecycle()
             val scope = rememberCoroutineScope()
             val driveResolution = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-                if (result.resultCode == Activity.RESULT_OK) vm.authorizationFromIntent(this, result.data)?.let(vm::acceptAuthorization)
+                if (result.resultCode == Activity.RESULT_OK) {
+                    vm.authorizationFromIntent(this, result.data)?.let(vm::acceptAuthorization)
+                }
             }
 
             fun connectDrive() {

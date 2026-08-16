@@ -32,20 +32,52 @@ class ShamsaWidget : GlanceAppWidget() {
         val entry = EntryPointAccessors.fromApplication(context, WidgetEntryPoint::class.java)
         val reminders = entry.repository().upcoming(3)
         val persian = entry.settings().settings.first().language == "fa"
+
         provideContent {
-            Column(
-                modifier = GlanceModifier.fillMaxSize().background(Color(0xFF201A32)).padding(16.dp),
-                verticalAlignment = Alignment.Vertical.Top
-            ) {
-                Text(if (persian) "شمسا" else "Shamsa", style = TextStyle(color = Color(0xFFFFD166), fontSize = 18.sp, fontWeight = FontWeight.Bold))
-                Spacer(GlanceModifier.height(10.dp))
-                if (reminders.isEmpty()) {
-                    Text(if (persian) "یادآور نزدیکی نیست" else "No upcoming reminders", style = TextStyle(color = Color.White))
-                }
-                reminders.forEach { reminder ->
-                    Row(GlanceModifier.fillMaxWidth().padding(vertical = 5.dp)) {
-                        Text(reminder.title, modifier = GlanceModifier.defaultWeight(), style = TextStyle(color = Color.White, fontWeight = FontWeight.Medium), maxLines = 1)
-                        Text(CountdownFormatter.compact(reminder.dueAtMillis, persian = persian), style = TextStyle(color = Color(0xFFB9A7FF), fontWeight = FontWeight.Bold))
+            GlanceTheme {
+                Column(
+                    modifier = GlanceModifier
+                        .fillMaxSize()
+                        .background(Color(0xFF201A32))
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.Vertical.Top
+                ) {
+                    Text(
+                        if (persian) "شمسا" else "Shamsa",
+                        style = TextStyle(
+                            color = GlanceTheme.colors.primary,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                    Spacer(GlanceModifier.height(10.dp))
+
+                    if (reminders.isEmpty()) {
+                        Text(
+                            if (persian) "یادآور نزدیکی نیست" else "No upcoming reminders",
+                            style = TextStyle(color = GlanceTheme.colors.onSurface)
+                        )
+                    }
+
+                    reminders.forEach { reminder ->
+                        Row(GlanceModifier.fillMaxWidth().padding(vertical = 5.dp)) {
+                            Text(
+                                reminder.title,
+                                modifier = GlanceModifier.defaultWeight(),
+                                style = TextStyle(
+                                    color = GlanceTheme.colors.onSurface,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                maxLines = 1
+                            )
+                            Text(
+                                CountdownFormatter.compact(reminder.dueAtMillis, persian = persian),
+                                style = TextStyle(
+                                    color = GlanceTheme.colors.secondary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                        }
                     }
                 }
             }
