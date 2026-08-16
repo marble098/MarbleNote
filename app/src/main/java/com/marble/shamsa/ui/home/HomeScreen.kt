@@ -20,6 +20,7 @@ import com.marble.shamsa.core.model.DisplayMode
 import com.marble.shamsa.core.model.Reminder
 import com.marble.shamsa.core.model.ReminderFilter
 import com.marble.shamsa.core.model.ReminderSort
+import com.marble.shamsa.core.model.ReminderStatus
 import com.marble.shamsa.core.time.JalaliCalendar
 
 @Composable

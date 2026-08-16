@@ -17,8 +17,8 @@ android {
         applicationId = "com.marble.shamsa"
         minSdk = 26
         targetSdk = 36
-        versionCode = (System.getenv("SHAMSA_VERSION_CODE") ?: "1000003").toInt()
-        versionName = System.getenv("SHAMSA_VERSION_NAME") ?: "1.0.3"
+        versionCode = (System.getenv("SHAMSA_VERSION_CODE") ?: "1000004").toInt()
+        versionName = System.getenv("SHAMSA_VERSION_NAME") ?: "1.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

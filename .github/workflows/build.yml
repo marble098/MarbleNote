@@ -31,18 +31,18 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Install Android SDK packages
         shell: bash
@@ -52,7 +52,7 @@ jobs:
           sdkmanager "platforms;android-${ANDROID_API}" "build-tools;36.0.0" "platform-tools"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.14.3'
           cache-read-only: false
@@ -94,16 +94,43 @@ jobs:
           umask 077
           printf '%s' "$SIGNING_MASTER" > "$PASS_FILE"
 
-          # Passwords are derived inside the runner and are never stored in the repository.
-          STORE_PASSWORD="$(printf 'store:%s' "$SIGNING_MASTER" | sha256sum | awk '{print substr($1,1,32)}')"
-          KEY_PASSWORD="$(printf 'key:%s' "$SIGNING_MASTER" | sha256sum | awk '{print substr($1,1,32)}')"
+          # Derive runner-only credentials. The v1 values are kept only long enough to
+          # migrate the already-created JKS; the signing keypair/certificate itself is unchanged.
+          LEGACY_STORE_PASSWORD="$(printf 'store:%s' "$SIGNING_MASTER" | sha256sum | awk '{print substr($1,1,32)}')"
+          LEGACY_KEY_PASSWORD="$(printf 'key:%s' "$SIGNING_MASTER" | sha256sum | awk '{print substr($1,1,32)}')"
+          STORE_PASSWORD="$(printf 'store:v2:%s' "$SIGNING_MASTER" | sha256sum | awk '{print substr($1,1,32)}')"
+          KEY_PASSWORD="$(printf 'key:v2:%s' "$SIGNING_MASTER" | sha256sum | awk '{print substr($1,1,32)}')"
           KEY_ALIAS="shamsa"
-          CREATED=0
+          PERSIST_SIGNING=0
+
+          # Derived values are not repository secrets themselves, so explicitly mask them
+          # before exporting them through GITHUB_ENV to later build steps.
+          echo "::add-mask::$LEGACY_STORE_PASSWORD"
+          echo "::add-mask::$LEGACY_KEY_PASSWORD"
+          echo "::add-mask::$STORE_PASSWORD"
+          echo "::add-mask::$KEY_PASSWORD"
 
           if [[ -s "$ENC_FILE" ]]; then
             echo "Restoring encrypted release keystore from repository..."
             openssl enc -d -aes-256-cbc -pbkdf2 -iter 250000 \
               -in "$ENC_FILE" -out "$KS" -pass file:"$PASS_FILE"
+
+            if keytool -list -keystore "$KS" -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
+              echo "Release keystore already uses protected v2 runner credentials."
+            elif keytool -list -keystore "$KS" -storepass "$LEGACY_STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
+              echo "Rotating exposed container passwords while preserving the Android signing key identity..."
+              keytool -keypasswd -keystore "$KS" -alias "$KEY_ALIAS" \
+                -storepass "$LEGACY_STORE_PASSWORD" -keypass "$LEGACY_KEY_PASSWORD" \
+                -new "$KEY_PASSWORD" >/dev/null
+              keytool -storepasswd -keystore "$KS" \
+                -storepass "$LEGACY_STORE_PASSWORD" -new "$STORE_PASSWORD" >/dev/null
+              openssl enc -aes-256-cbc -salt -pbkdf2 -iter 250000 \
+                -in "$KS" -out "$ENC_FILE" -pass file:"$PASS_FILE"
+              PERSIST_SIGNING=1
+            else
+              echo "::error::Unable to open the persistent release keystore with current or legacy credentials."
+              exit 4
+            fi
           else
             if [[ "${GITHUB_REF_TYPE}" != "branch" || "${GITHUB_REF_NAME}" != "main" ]]; then
               echo "::error::Release signing identity is not initialized yet. Run the main-branch workflow once first."
@@ -119,7 +146,7 @@ jobs:
 
             openssl enc -aes-256-cbc -salt -pbkdf2 -iter 250000 \
               -in "$KS" -out "$ENC_FILE" -pass file:"$PASS_FILE"
-            CREATED=1
+            PERSIST_SIGNING=1
           fi
 
           CERT_SHA1="$(keytool -list -v -keystore "$KS" -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" \
@@ -140,11 +167,11 @@ jobs:
           echo "SHA-1: \`$CERT_SHA1\`" >> "$GITHUB_STEP_SUMMARY"
           echo "Use this SHA-1 with package \`com.marble.shamsa\` for the Google Drive Android OAuth client." >> "$GITHUB_STEP_SUMMARY"
 
-          if [[ "$CREATED" == "1" ]]; then
+          if [[ "$PERSIST_SIGNING" == "1" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add "$ENC_FILE" "$SHA_FILE"
-            git commit -m "chore: persist encrypted release signing identity [skip ci]"
+            git commit -m "chore: persist protected release signing identity [skip ci]"
             git push origin HEAD:main
             echo "Encrypted signing identity persisted on main. The wrapping secret remains only in GitHub Secrets."
           fi
