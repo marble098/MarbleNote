@@ -3,6 +3,8 @@ package com.marble.shamsa.core.cloud
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.AuthorizationResult
 import com.google.android.gms.auth.api.identity.ClearTokenRequest
@@ -29,6 +31,8 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.security.MessageDigest
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -53,7 +57,10 @@ class DriveSyncManager @Inject constructor(
         private const val SNAPSHOT_NAME = "shamsa-sync-v1.json"
     }
 
-    private val authorizationClient by lazy { Identity.getAuthorizationClient(context) }
+    private val authorizationClient by lazy {
+        Identity.getAuthorizationClient(context)
+    }
+
     private val requestedScopes = listOf(Scope(DRIVE_SCOPE))
 
     private fun request() = AuthorizationRequest.builder()
@@ -61,33 +68,47 @@ class DriveSyncManager @Inject constructor(
         .build()
 
     suspend fun beginAuthorization(activity: Activity): AuthorizationResult =
-        Identity.getAuthorizationClient(activity).authorize(request()).await()
+        Identity.getAuthorizationClient(activity)
+            .authorize(request())
+            .await()
 
-    fun authorizationFromIntent(activity: Activity, data: Intent?): AuthorizationResult? =
+    fun authorizationFromIntent(
+        activity: Activity,
+        data: Intent?
+    ): AuthorizationResult? =
         data?.let {
-            Identity.getAuthorizationClient(activity).getAuthorizationResultFromIntent(it)
+            Identity.getAuthorizationClient(activity)
+                .getAuthorizationResultFromIntent(it)
         }
 
     suspend fun acceptAuthorization(result: AuthorizationResult): SyncResult {
         val token = result.accessToken ?: return SyncResult.NeedsAuthorization
+
         if (result.grantedScopes.none { it == DRIVE_SCOPE }) {
-            return SyncResult.Failure("Google Drive did not grant the required appDataFolder scope.")
+            return SyncResult.Failure(
+                "Google Drive did not grant the required appDataFolder scope."
+            )
         }
+
         settings.saveDriveToken(token)
         return syncWithToken(token)
     }
 
     suspend fun syncCached(): SyncResult {
-        val token = settings.cachedDriveToken() ?: return SyncResult.NeedsAuthorization
+        val token = settings.cachedDriveToken()
+            ?: return SyncResult.NeedsAuthorization
         return syncWithToken(token)
     }
 
     suspend fun disconnect() {
         val storedToken = settings.storedDriveToken()
+
         if (!storedToken.isNullOrBlank()) {
             try {
                 authorizationClient.clearToken(
-                    ClearTokenRequest.builder().setToken(storedToken).build()
+                    ClearTokenRequest.builder()
+                        .setToken(storedToken)
+                        .build()
                 ).await()
             } catch (e: CancellationException) {
                 throw e
@@ -109,6 +130,9 @@ class DriveSyncManager @Inject constructor(
         settings.clearDrive()
     }
 
+    fun oauthIdentitySummary(): String =
+        "${context.packageName} • SHA-1 ${signingSha1()}"
+
     fun describeAuthorizationError(error: Throwable): String {
         val api = generateSequence<Throwable>(error) { it.cause }
             .filterIsInstance<ApiException>()
@@ -116,42 +140,58 @@ class DriveSyncManager @Inject constructor(
 
         if (api != null) {
             return when (api.statusCode) {
-                10 -> "Google OAuth rejected this build (status 10 / DEVELOPER_ERROR). Configure an Android OAuth client for package com.marble.shamsa and the RELEASE SHA-1 printed by GitHub Actions."
-                7 -> "Google authorization could not reach Google Play services. Check the network and try again."
-                16 -> "Google authorization was cancelled."
-                else -> "Google authorization failed (${api.statusCode}: ${CommonStatusCodes.getStatusCodeString(api.statusCode)})."
+                10 ->
+                    "Google OAuth rejected this installed build (status 10 / DEVELOPER_ERROR). " +
+                        "Create or fix an Android OAuth client with ${oauthIdentitySummary()}, " +
+                        "enable Google Drive API, and include drive.appdata on the OAuth consent screen."
+
+                7 ->
+                    "Google authorization could not reach Google Play services. " +
+                        "Check connectivity, Google Play services, and try again."
+
+                16, 12501 ->
+                    "Google authorization was cancelled by the user."
+
+                else ->
+                    "Google authorization failed " +
+                        "(${api.statusCode}: ${CommonStatusCodes.getStatusCodeString(api.statusCode)}). " +
+                        oauthIdentitySummary()
             }
         }
 
-        return error.message?.takeIf { it.isNotBlank() }?.take(220)
-            ?: "Google Drive authorization failed."
+        return error.message
+            ?.takeIf { it.isNotBlank() }
+            ?.take(300)
+            ?: "Google Drive authorization failed. ${oauthIdentitySummary()}"
     }
 
-    private suspend fun syncWithToken(token: String): SyncResult = withContext(Dispatchers.IO) {
-        try {
-            val remoteFile = findSnapshot(token)
-            if (remoteFile != null) {
-                downloadSnapshot(token, remoteFile)?.let { remote ->
-                    repository.merge(remote)
-                    repository.rescheduleAll()
+    private suspend fun syncWithToken(token: String): SyncResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val remoteFile = findSnapshot(token)
+
+                if (remoteFile != null) {
+                    downloadSnapshot(token, remoteFile)?.let { remote ->
+                        repository.merge(remote)
+                        repository.rescheduleAll()
+                    }
                 }
-            }
 
-            val mergedLocal = repository.snapshot(settings.deviceId())
-            uploadSnapshot(token, remoteFile, mergedLocal)
-            settings.markSynced()
-            SyncResult.Success
-        } catch (e: DriveAuthorizationExpired) {
-            settings.clearDrive()
-            SyncResult.NeedsAuthorization
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: IOException) {
-            SyncResult.Failure(e.message ?: "Drive network error")
-        } catch (e: Exception) {
-            SyncResult.Failure(e.message ?: e.javaClass.simpleName)
+                val mergedLocal = repository.snapshot(settings.deviceId())
+                uploadSnapshot(token, remoteFile, mergedLocal)
+                settings.markSynced()
+                SyncResult.Success
+            } catch (e: DriveAuthorizationExpired) {
+                settings.clearDrive()
+                SyncResult.NeedsAuthorization
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IOException) {
+                SyncResult.Failure(e.message ?: "Drive network error")
+            } catch (e: Exception) {
+                SyncResult.Failure(e.message ?: e.javaClass.simpleName)
+            }
         }
-    }
 
     private fun auth(token: String, builder: Request.Builder) =
         builder.header("Authorization", "Bearer $token")
@@ -168,9 +208,17 @@ class DriveSyncManager @Inject constructor(
             .addQueryParameter("fields", "files(id,name,modifiedTime)")
             .build()
 
-        client.newCall(auth(token, Request.Builder().url(url)).build()).execute().use { response ->
-            if (!response.isSuccessful) throw response.asDriveException("Drive list")
-            val root = json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject
+        client.newCall(
+            auth(token, Request.Builder().url(url)).build()
+        ).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw response.asDriveException("Drive list")
+            }
+
+            val root = json.parseToJsonElement(
+                response.body?.string().orEmpty()
+            ).jsonObject
+
             return root["files"]
                 ?.jsonArray
                 ?.firstOrNull()
@@ -181,22 +229,35 @@ class DriveSyncManager @Inject constructor(
         }
     }
 
-    private fun downloadSnapshot(token: String, id: String): CloudSnapshot? {
+    private fun downloadSnapshot(
+        token: String,
+        id: String
+    ): CloudSnapshot? {
         val req = auth(
             token,
-            Request.Builder().url("https://www.googleapis.com/drive/v3/files/$id?alt=media")
+            Request.Builder()
+                .url("https://www.googleapis.com/drive/v3/files/$id?alt=media")
         ).build()
 
         client.newCall(req).execute().use { response ->
             if (response.code == 404) return null
-            if (!response.isSuccessful) throw response.asDriveException("Drive download")
+
+            if (!response.isSuccessful) {
+                throw response.asDriveException("Drive download")
+            }
+
             val body = response.body?.string().orEmpty()
             if (body.isBlank()) return null
+
             return json.decodeFromString(body)
         }
     }
 
-    private fun uploadSnapshot(token: String, existingId: String?, snapshot: CloudSnapshot) {
+    private fun uploadSnapshot(
+        token: String,
+        existingId: String?,
+        snapshot: CloudSnapshot
+    ) {
         val bodyText = json.encodeToString(snapshot)
         val jsonType = "application/json; charset=utf-8".toMediaType()
         val fileId = existingId ?: createSnapshotFile(token, jsonType)
@@ -204,17 +265,27 @@ class DriveSyncManager @Inject constructor(
         val request = auth(
             token,
             Request.Builder()
-                .url("https://www.googleapis.com/upload/drive/v3/files/$fileId?uploadType=media")
+                .url(
+                    "https://www.googleapis.com/upload/drive/v3/files/" +
+                        "$fileId?uploadType=media"
+                )
                 .patch(bodyText.toRequestBody(jsonType))
         ).build()
 
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw response.asDriveException("Drive upload")
+            if (!response.isSuccessful) {
+                throw response.asDriveException("Drive upload")
+            }
         }
     }
 
-    private fun createSnapshotFile(token: String, jsonType: MediaType): String {
-        val metadata = """{"name":"$SNAPSHOT_NAME","parents":["appDataFolder"]}"""
+    private fun createSnapshotFile(
+        token: String,
+        jsonType: MediaType
+    ): String {
+        val metadata =
+            """{"name":"$SNAPSHOT_NAME","parents":["appDataFolder"]}"""
+
         val request = auth(
             token,
             Request.Builder()
@@ -223,24 +294,73 @@ class DriveSyncManager @Inject constructor(
         ).build()
 
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw response.asDriveException("Drive create")
-            val root = json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject
-            return root["id"]?.jsonPrimitive?.contentOrNull
+            if (!response.isSuccessful) {
+                throw response.asDriveException("Drive create")
+            }
+
+            val root = json.parseToJsonElement(
+                response.body?.string().orEmpty()
+            ).jsonObject
+
+            return root["id"]
+                ?.jsonPrimitive
+                ?.contentOrNull
                 ?: throw IOException("Drive create returned no file id")
         }
     }
 
     private fun Response.asDriveException(operation: String): IOException {
-        val detail = runCatching { body?.string().orEmpty() }
-            .getOrDefault("")
+        val detail = runCatching {
+            body?.string().orEmpty()
+        }.getOrDefault("")
             .replace(Regex("\\s+"), " ")
-            .take(240)
+            .take(320)
 
         if (code == 401) {
-            return DriveAuthorizationExpired("$operation authorization expired (HTTP 401)")
+            return DriveAuthorizationExpired(
+                "$operation authorization expired (HTTP 401)"
+            )
         }
 
         val suffix = if (detail.isBlank()) "" else ": $detail"
         return IOException("$operation failed (HTTP $code)$suffix")
+    }
+
+    @Suppress("DEPRECATION")
+    private fun signingSha1(): String {
+        return runCatching {
+            val signingFlags =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+                    PackageManager.GET_SIGNING_CERTIFICATES
+                else
+                    PackageManager.GET_SIGNATURES
+
+            val packageInfo = context.packageManager.getPackageInfo(
+                context.packageName,
+                signingFlags
+            )
+
+            val signatureBytes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val info = packageInfo.signingInfo
+                val signatures = if (info?.hasMultipleSigners() == true) {
+                    info.apkContentsSigners
+                } else {
+                    info?.signingCertificateHistory
+                }
+                signatures?.firstOrNull()?.toByteArray()
+            } else {
+                packageInfo.signatures?.firstOrNull()?.toByteArray()
+            } ?: return@runCatching "unavailable"
+
+            MessageDigest.getInstance("SHA-1")
+                .digest(signatureBytes)
+                .joinToString(":") { byte ->
+                    String.format(
+                        Locale.US,
+                        "%02X",
+                        byte.toInt() and 0xFF
+                    )
+                }
+        }.getOrDefault("unavailable")
     }
 }

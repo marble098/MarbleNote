@@ -3,6 +3,7 @@ package com.marble.shamsa.core.data
 import android.content.Context
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import com.marble.shamsa.core.model.CountdownStyle
 import com.marble.shamsa.core.model.DisplayMode
 import com.marble.shamsa.core.model.ThemeMode
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -20,6 +21,7 @@ data class AppSettings(
     val language: String = "fa",
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val displayMode: DisplayMode = DisplayMode.CARDS,
+    val countdownStyle: CountdownStyle = CountdownStyle.SEGMENTS,
     val popupReminders: Boolean = true,
     val driveConnected: Boolean = false
 )
@@ -31,6 +33,7 @@ class SettingsStore @Inject constructor(@ApplicationContext private val context:
         val language = stringPreferencesKey("language")
         val theme = stringPreferencesKey("theme")
         val display = stringPreferencesKey("display")
+        val countdownStyle = stringPreferencesKey("countdown_style")
         val popup = booleanPreferencesKey("popup")
         val driveConnected = booleanPreferencesKey("drive_connected")
         val driveToken = stringPreferencesKey("drive_token")
@@ -49,6 +52,9 @@ class SettingsStore @Inject constructor(@ApplicationContext private val context:
             displayMode = runCatching {
                 DisplayMode.valueOf(p[Keys.display] ?: DisplayMode.CARDS.name)
             }.getOrDefault(DisplayMode.CARDS),
+            countdownStyle = runCatching {
+                CountdownStyle.valueOf(p[Keys.countdownStyle] ?: CountdownStyle.SEGMENTS.name)
+            }.getOrDefault(CountdownStyle.SEGMENTS),
             popupReminders = p[Keys.popup] ?: true,
             driveConnected = p[Keys.driveConnected] ?: false
         )
@@ -65,6 +71,9 @@ class SettingsStore @Inject constructor(@ApplicationContext private val context:
 
     suspend fun setDisplay(v: DisplayMode) =
         context.dataStore.edit { it[Keys.display] = v.name }
+
+    suspend fun setCountdownStyle(v: CountdownStyle) =
+        context.dataStore.edit { it[Keys.countdownStyle] = v.name }
 
     suspend fun setPopup(v: Boolean) =
         context.dataStore.edit { it[Keys.popup] = v }

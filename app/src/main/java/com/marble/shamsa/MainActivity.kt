@@ -26,13 +26,17 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
-    @Inject lateinit var scheduler: ReminderScheduler
+    @Inject
+    lateinit var scheduler: ReminderScheduler
 
     private val notificationPermission =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContent {
             val vm: MainViewModel = hiltViewModel()
             val settings by vm.settings.collectAsStateWithLifecycle()
@@ -40,38 +44,70 @@ class MainActivity : AppCompatActivity() {
             val scope = rememberCoroutineScope()
 
             val driveResolution =
-                rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-                    if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+                rememberLauncherForActivityResult(
+                    ActivityResultContracts.StartIntentSenderForResult()
+                ) { result ->
+                    val data = result.data
+
+                    /*
+                     * IMPORTANT:
+                     * Google can return an error payload with RESULT_CANCELED.
+                     * Decode any returned Intent first so DEVELOPER_ERROR,
+                     * network errors, etc. are not mislabeled as user cancel.
+                     */
+                    if (data != null) {
                         try {
-                            val authorization = vm.authorizationFromIntent(this, result.data)
+                            val authorization =
+                                vm.authorizationFromIntent(this, data)
+
                             if (authorization != null) {
                                 vm.acceptAuthorization(authorization)
+                            } else if (result.resultCode == Activity.RESULT_CANCELED) {
+                                vm.driveAuthorizationCancelled()
                             } else {
                                 vm.driveAuthorizationFailed(
-                                    IllegalStateException("Google returned an empty authorization result.")
+                                    IllegalStateException(
+                                        "Google returned an empty authorization result."
+                                    )
                                 )
                             }
                         } catch (t: Throwable) {
                             vm.driveAuthorizationFailed(t)
                         }
-                    } else {
+                    } else if (result.resultCode == Activity.RESULT_CANCELED) {
                         vm.driveAuthorizationCancelled()
+                    } else {
+                        vm.driveAuthorizationFailed(
+                            IllegalStateException(
+                                "Google authorization returned no result Intent."
+                            )
+                        )
                     }
                 }
 
             fun connectDrive() {
                 scope.launch {
                     vm.driveAuthorizationStarted()
+
                     try {
-                        val result = vm.beginDriveAuthorization(this@MainActivity)
+                        val result =
+                            vm.beginDriveAuthorization(this@MainActivity)
+
                         val pending = result.pendingIntent
+
                         if (pending != null) {
-                            driveResolution.launch(IntentSenderRequest.Builder(pending).build())
+                            driveResolution.launch(
+                                IntentSenderRequest.Builder(pending)
+                                    .build()
+                            )
                         } else if (result.accessToken != null) {
                             vm.acceptAuthorization(result)
                         } else {
                             vm.driveAuthorizationFailed(
-                                IllegalStateException("Google authorization returned neither a token nor a resolution.")
+                                IllegalStateException(
+                                    "Google authorization returned neither " +
+                                        "an access token nor a resolution."
+                                )
                             )
                         }
                     } catch (e: CancellationException) {
@@ -96,11 +132,17 @@ class MainActivity : AppCompatActivity() {
                         onLanguage = vm::setLanguage,
                         onNotifications = {
                             if (Build.VERSION.SDK_INT >= 33) {
-                                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                notificationPermission.launch(
+                                    Manifest.permission.POST_NOTIFICATIONS
+                                )
                             }
                         },
                         onExactAlarm = {
-                            runCatching { startActivity(scheduler.exactAlarmSettingsIntent()) }
+                            runCatching {
+                                startActivity(
+                                    scheduler.exactAlarmSettingsIntent()
+                                )
+                            }
                         },
                         onFullScreen = {
                             scheduler.fullScreenSettingsIntent()?.let {
@@ -116,14 +158,19 @@ class MainActivity : AppCompatActivity() {
                         viewModel = vm,
                         onDrive = ::connectDrive,
                         onExact = {
-                            runCatching { startActivity(scheduler.exactAlarmSettingsIntent()) }
+                            runCatching {
+                                startActivity(
+                                    scheduler.exactAlarmSettingsIntent()
+                                )
+                            }
                         },
                         onFullScreen = {
                             scheduler.fullScreenSettingsIntent()?.let {
                                 runCatching { startActivity(it) }
                             }
                         },
-                        initialReminderId = intent.getStringExtra(ReminderScheduler.EXTRA_ID)
+                        initialReminderId =
+                            intent.getStringExtra(ReminderScheduler.EXTRA_ID)
                     )
                 }
             }

@@ -2,8 +2,10 @@ package com.marble.shamsa.core.model
 
 import kotlinx.serialization.Serializable
 
+// SHAMSA_FEATURE_PACK_V4
+
 @Serializable
-enum class ReminderStatus { ACTIVE, COMPLETED }
+enum class ReminderStatus { ACTIVE, COMPLETED, CANCELED }
 
 @Serializable
 enum class ReminderPriority(val level: Int) { LOW(0), NORMAL(1), HIGH(2), URGENT(3) }
@@ -15,7 +17,10 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 enum class DisplayMode { COMPACT, CARDS, FOCUS }
 
 @Serializable
-enum class ReminderFilter { ALL, TODAY, UPCOMING, COMPLETED }
+enum class CountdownStyle { COMPACT, DIGITAL, SEGMENTS, FOCUS }
+
+@Serializable
+enum class ReminderFilter { ALL, TODAY, UPCOMING, COMPLETED, CANCELED }
 
 @Serializable
 enum class ReminderSort { DUE, PRIORITY, CREATED }
