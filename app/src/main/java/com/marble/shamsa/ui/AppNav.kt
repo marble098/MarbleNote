@@ -14,7 +14,7 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import com.marble.shamsa.R
 import com.marble.shamsa.core.data.AppSettings
-import com.marble.shamsa.core.model.*
+import com.marble.shamsa.core.model.Reminder
 import com.marble.shamsa.ui.categories.CategoriesScreen
 import com.marble.shamsa.ui.editor.ReminderEditorScreen
 import com.marble.shamsa.ui.home.HomeScreen
@@ -57,7 +57,9 @@ fun ShamsaAppNav(
     val persian = settings.language == "fa"
 
     LaunchedEffect(initialReminderId) {
-        initialReminderId?.takeIf { it.isNotBlank() }?.let { nav.navigate("edit/$it") }
+        initialReminderId
+            ?.takeIf { it.isNotBlank() }
+            ?.let { nav.navigate("edit/$it") }
     }
 
     Scaffold(
@@ -73,7 +75,11 @@ fun ShamsaAppNav(
                             selected = route == tab.route,
                             onClick = {
                                 nav.navigate(tab.route) {
-                                    popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                                    popUpTo(
+                                        nav.graph.findStartDestination().id
+                                    ) {
+                                        saveState = true
+                                    }
                                     launchSingleTop = true
                                     restoreState = true
                                 }
@@ -81,7 +87,8 @@ fun ShamsaAppNav(
                             icon = { Icon(tab.icon, null) },
                             label = { Text(stringResource(tab.label)) },
                             colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                                indicatorColor =
+                                    MaterialTheme.colorScheme.primaryContainer
                             )
                         )
                     }
@@ -93,33 +100,62 @@ fun ShamsaAppNav(
                 ExtendedFloatingActionButton(
                     onClick = { nav.navigate("edit/new") },
                     icon = { Icon(Icons.Rounded.Add, null) },
-                    text = { Text(if (persian) "یادآور جدید" else "New reminder") }
+                    text = {
+                        Text(
+                            if (persian) "یادآور جدید"
+                            else "New reminder"
+                        )
+                    }
                 )
             }
         }
     ) { padding ->
         NavHost(
-            nav,
+            navController = nav,
             startDestination = "home",
             modifier = Modifier.padding(padding),
-            enterTransition = { fadeIn() + slideInHorizontally { it / 9 } },
+            enterTransition = {
+                fadeIn() + slideInHorizontally { it / 9 }
+            },
             exitTransition = { fadeOut() },
-            popEnterTransition = { fadeIn() + slideInHorizontally { -it / 9 } }
+            popEnterTransition = {
+                fadeIn() + slideInHorizontally { -it / 9 }
+            }
         ) {
             composable("home") {
                 HomeScreen(
-                    reminders, query, filter, sort, settings.displayMode, persian,
-                    viewModel::setQuery, viewModel::setFilter, viewModel::setSort,
-                    { nav.navigate("edit/$it") }, viewModel::complete
+                    reminders = reminders,
+                    query = query,
+                    filter = filter,
+                    sort = sort,
+                    display = settings.displayMode,
+                    countdownStyle = settings.countdownStyle,
+                    persian = persian,
+                    onQuery = viewModel::setQuery,
+                    onFilter = viewModel::setFilter,
+                    onSort = viewModel::setSort,
+                    onOpen = { nav.navigate("edit/$it") },
+                    onComplete = viewModel::complete,
+                    onCancel = viewModel::cancel,
+                    onDelete = viewModel::delete
                 )
             }
 
             composable("timeline") {
-                TimelineScreen(reminders, persian) { nav.navigate("edit/$it") }
+                TimelineScreen(
+                    reminders,
+                    persian
+                ) {
+                    nav.navigate("edit/$it")
+                }
             }
 
             composable("categories") {
-                CategoriesScreen(categories, viewModel::saveCategory, persian)
+                CategoriesScreen(
+                    categories,
+                    viewModel::saveCategory,
+                    persian
+                )
             }
 
             composable("settings") {
@@ -129,6 +165,7 @@ fun ShamsaAppNav(
                     onLanguage = viewModel::setLanguage,
                     onTheme = viewModel::setTheme,
                     onDisplay = viewModel::setDisplay,
+                    onCountdownStyle = viewModel::setCountdownStyle,
                     onPopup = viewModel::setPopup,
                     onDrive = onDrive,
                     onSync = viewModel::syncNow,
@@ -140,10 +177,16 @@ fun ShamsaAppNav(
 
             composable("edit/{id}") { entry ->
                 val id = entry.arguments?.getString("id")
-                var existing by remember(id) { mutableStateOf<Reminder?>(null) }
-                LaunchedEffect(id) {
-                    if (id != "new") existing = viewModel.getReminder(id.orEmpty())
+                var existing by remember(id) {
+                    mutableStateOf<Reminder?>(null)
                 }
+
+                LaunchedEffect(id) {
+                    if (id != "new") {
+                        existing = viewModel.getReminder(id.orEmpty())
+                    }
+                }
+
                 ReminderEditorScreen(
                     existing,
                     categories,
