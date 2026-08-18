@@ -28,28 +28,78 @@ fun CategoriesScreen(categories: List<Category>, onSave: (Category) -> Unit, per
     var creating by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
-        LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        LazyColumn(
+            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 110.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             item {
+                Text("🎨", style = MaterialTheme.typography.displaySmall)
                 Text(if (persian) "دسته‌بندی‌ها" else "Categories", style = MaterialTheme.typography.headlineLarge)
                 Text(
-                    if (persian) "برای هر نوع یادآور رنگ و آیکن جدا داشته باش." else "Give each reminder group its own icon and accent.",
+                    if (persian) "هر موضوع، شخصیت و رنگ خودش را داشته باشد." else "Give every group its own personality.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
             }
+
+            if (categories.isEmpty()) {
+                item {
+                    Card(
+                        Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .5f)
+                        )
+                    ) {
+                        Column(
+                            Modifier.fillMaxWidth().padding(30.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("🗂️", style = MaterialTheme.typography.displaySmall)
+                            Text(
+                                if (persian) "اولین دسته را بساز" else "Create your first category",
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                        }
+                    }
+                }
+            }
+
             items(categories, key = { it.id }) { category ->
-                Card(onClick = { editing = category }, modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Surface(shape = CircleShape, color = Color(category.colorArgb).copy(alpha = .15f), modifier = Modifier.size(48.dp)) {
-                            Box(contentAlignment = Alignment.Center) { Icon(IconCatalog.icon(category.icon), null, tint = Color(category.colorArgb)) }
+                val accent = Color(category.colorArgb)
+                Card(
+                    onClick = { editing = category },
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().background(
+                            Brush.horizontalGradient(listOf(accent.copy(alpha = .12f), Color.Transparent))
+                        ).padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            color = accent.copy(alpha = .16f),
+                            modifier = Modifier.size(50.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(IconCatalog.icon(category.icon), null, tint = accent)
+                            }
                         }
                         Spacer(Modifier.width(14.dp))
-                        Text(category.name, style = MaterialTheme.typography.titleMedium)
+                        Text(category.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.outline)
                     }
                 }
             }
         }
-        FloatingActionButton(onClick = { creating = true }, modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp)) { Icon(Icons.Rounded.Add, null) }
+
+        ExtendedFloatingActionButton(
+            onClick = { creating = true },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(22.dp),
+            icon = { Icon(Icons.Rounded.Add, null) },
+            text = { Text(if (persian) "دسته جدید" else "New category") }
+        )
     }
 
     if (creating || editing != null) {
@@ -70,35 +120,63 @@ fun CategoriesScreen(categories: List<Category>, onSave: (Category) -> Unit, per
 private fun CategoryEditor(value: Category?, persian: Boolean, onDismiss: () -> Unit, onSave: (Category) -> Unit) {
     var name by remember(value) { mutableStateOf(value?.name.orEmpty()) }
     var icon by remember(value) { mutableStateOf(value?.icon ?: "folder") }
-    var color by remember(value) { mutableLongStateOf(value?.colorArgb ?: 0xFF00A7C7) }
+    var color by remember(value) { mutableLongStateOf(value?.colorArgb ?: 0xFF008DA7) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (value == null) if (persian) "دسته جدید" else "New category" else if (persian) "ویرایش دسته" else "Edit category") },
+        icon = { Text(if (value == null) "✨" else "✏️", style = MaterialTheme.typography.headlineMedium) },
+        title = {
+            Text(
+                if (value == null)
+                    if (persian) "دسته جدید" else "New category"
+                else
+                    if (persian) "ویرایش دسته" else "Edit category"
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(if (persian) "نام" else "Name") })
-                Text(if (persian) "آیکن" else "Icon", style = MaterialTheme.typography.labelLarge)
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    name, { name = it }, Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(if (persian) "نام" else "Name") },
+                    shape = MaterialTheme.shapes.medium
+                )
+                Text(if (persian) "✨ آیکن" else "✨ Icon", style = MaterialTheme.typography.labelLarge)
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     IconCatalog.categoryKeys.forEach { key ->
-                        FilterChip(selected = icon == key, onClick = { icon = key }, label = { Icon(IconCatalog.icon(key), null, Modifier.size(20.dp)) })
+                        FilterChip(
+                            selected = icon == key,
+                            onClick = { icon = key },
+                            label = { Icon(IconCatalog.icon(key), null, Modifier.size(20.dp)) }
+                        )
                     }
                 }
-                Text(if (persian) "رنگ" else "Color", style = MaterialTheme.typography.labelLarge)
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(if (persian) "🎨 رنگ" else "🎨 Color", style = MaterialTheme.typography.labelLarge)
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     AccentPresets.values.forEach { argb ->
                         Box(
                             Modifier.size(if (color == argb) 42.dp else 36.dp)
-                                .background(Brush.linearGradient(listOf(Color(argb), Color(argb).copy(alpha = .55f))), CircleShape)
+                                .background(
+                                    Brush.linearGradient(listOf(Color(argb), Color(argb).copy(alpha = .55f))),
+                                    CircleShape
+                                )
                                 .clickable { color = argb },
                             contentAlignment = Alignment.Center
-                        ) { if (color == argb) Text("✓", color = Color.White) }
+                        ) {
+                            if (color == argb) Text("✓", color = Color.White)
+                        }
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = {
                     val now = System.currentTimeMillis()
                     onSave(
@@ -115,6 +193,8 @@ private fun CategoryEditor(value: Category?, persian: Boolean, onDismiss: () -> 
                 enabled = name.isNotBlank()
             ) { Text(if (persian) "ذخیره" else "Save") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(if (persian) "انصراف" else "Cancel") } }
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(if (persian) "انصراف" else "Cancel") }
+        }
     )
 }

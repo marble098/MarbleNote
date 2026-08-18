@@ -84,7 +84,7 @@ class ReminderScheduler @Inject constructor(@ApplicationContext private val cont
         )
 
         val builder = NotificationCompat.Builder(context, REMINDER_CHANNEL)
-            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(reminder.title)
             .setContentText(reminder.notes.ifBlank { context.getString(R.string.ring_title) })
             .setPriority(NotificationCompat.PRIORITY_MAX)
