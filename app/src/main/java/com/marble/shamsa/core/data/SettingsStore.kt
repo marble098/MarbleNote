@@ -43,18 +43,31 @@ class SettingsStore @Inject constructor(@ApplicationContext private val context:
         AppSettings(
             onboardingComplete = p[Keys.onboarding] ?: false,
             language = p[Keys.language] ?: "fa",
-            themeMode = runCatching { ThemeMode.valueOf(p[Keys.theme] ?: ThemeMode.SYSTEM.name) }.getOrDefault(ThemeMode.SYSTEM),
-            displayMode = runCatching { DisplayMode.valueOf(p[Keys.display] ?: DisplayMode.CARDS.name) }.getOrDefault(DisplayMode.CARDS),
+            themeMode = runCatching {
+                ThemeMode.valueOf(p[Keys.theme] ?: ThemeMode.SYSTEM.name)
+            }.getOrDefault(ThemeMode.SYSTEM),
+            displayMode = runCatching {
+                DisplayMode.valueOf(p[Keys.display] ?: DisplayMode.CARDS.name)
+            }.getOrDefault(DisplayMode.CARDS),
             popupReminders = p[Keys.popup] ?: true,
             driveConnected = p[Keys.driveConnected] ?: false
         )
     }
 
-    suspend fun setOnboardingComplete(v: Boolean) = context.dataStore.edit { it[Keys.onboarding] = v }
-    suspend fun setLanguage(v: String) = context.dataStore.edit { it[Keys.language] = v }
-    suspend fun setTheme(v: ThemeMode) = context.dataStore.edit { it[Keys.theme] = v.name }
-    suspend fun setDisplay(v: DisplayMode) = context.dataStore.edit { it[Keys.display] = v.name }
-    suspend fun setPopup(v: Boolean) = context.dataStore.edit { it[Keys.popup] = v }
+    suspend fun setOnboardingComplete(v: Boolean) =
+        context.dataStore.edit { it[Keys.onboarding] = v }
+
+    suspend fun setLanguage(v: String) =
+        context.dataStore.edit { it[Keys.language] = v }
+
+    suspend fun setTheme(v: ThemeMode) =
+        context.dataStore.edit { it[Keys.theme] = v.name }
+
+    suspend fun setDisplay(v: DisplayMode) =
+        context.dataStore.edit { it[Keys.display] = v.name }
+
+    suspend fun setPopup(v: Boolean) =
+        context.dataStore.edit { it[Keys.popup] = v }
 
     suspend fun saveDriveToken(token: String) = context.dataStore.edit {
         it[Keys.driveToken] = token
@@ -69,17 +82,24 @@ class SettingsStore @Inject constructor(@ApplicationContext private val context:
         return token?.takeIf { System.currentTimeMillis() - at < 45 * 60_000L }
     }
 
+    suspend fun storedDriveToken(): String? =
+        context.dataStore.data.first()[Keys.driveToken]
+
     suspend fun clearDrive() = context.dataStore.edit {
-        it.remove(Keys.driveToken); it.remove(Keys.driveTokenAt); it[Keys.driveConnected] = false
+        it.remove(Keys.driveToken)
+        it.remove(Keys.driveTokenAt)
+        it[Keys.driveConnected] = false
     }
 
     suspend fun deviceId(): String {
         var result = ""
         context.dataStore.edit { p ->
-            result = p[Keys.deviceId] ?: UUID.randomUUID().toString().also { p[Keys.deviceId] = it }
+            result = p[Keys.deviceId]
+                ?: UUID.randomUUID().toString().also { p[Keys.deviceId] = it }
         }
         return result
     }
 
-    suspend fun markSynced() = context.dataStore.edit { it[Keys.lastSync] = System.currentTimeMillis() }
+    suspend fun markSynced() =
+        context.dataStore.edit { it[Keys.lastSync] = System.currentTimeMillis() }
 }

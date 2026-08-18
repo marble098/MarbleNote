@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
@@ -21,7 +22,11 @@ import com.marble.shamsa.ui.settings.SettingsScreen
 import com.marble.shamsa.ui.timeline.TimelineScreen
 import com.marble.shamsa.ui.viewmodel.MainViewModel
 
-private data class Tab(val route:String, val label:Int, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+private data class Tab(
+    val route: String,
+    val label: Int,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector
+)
 
 @Composable
 fun ShamsaAppNav(
@@ -38,7 +43,15 @@ fun ShamsaAppNav(
     val query by viewModel.query.collectAsState()
     val filter by viewModel.filter.collectAsState()
     val sort by viewModel.sort.collectAsState()
-    val tabs = listOf(Tab("home",R.string.home,Icons.Rounded.Home),Tab("timeline",R.string.timeline,Icons.Rounded.CalendarMonth),Tab("categories",R.string.categories,Icons.Rounded.Category),Tab("settings",R.string.settings,Icons.Rounded.Settings))
+    val driveUi by viewModel.driveUi.collectAsState()
+
+    val tabs = listOf(
+        Tab("home", R.string.home, Icons.Rounded.Home),
+        Tab("timeline", R.string.timeline, Icons.Rounded.CalendarMonth),
+        Tab("categories", R.string.categories, Icons.Rounded.Category),
+        Tab("settings", R.string.settings, Icons.Rounded.Settings)
+    )
+
     val back by nav.currentBackStackEntryAsState()
     val route = back?.destination?.route
     val persian = settings.language == "fa"
@@ -48,19 +61,106 @@ fun ShamsaAppNav(
     }
 
     Scaffold(
-        bottomBar = { if (route in tabs.map { it.route }) NavigationBar { tabs.forEach { tab -> NavigationBarItem(selected=route==tab.route,onClick={nav.navigate(tab.route){popUpTo(nav.graph.findStartDestination().id){saveState=true};launchSingleTop=true;restoreState=true}},icon={Icon(tab.icon,null)},label={Text(stringResource(tab.label))}) } } },
-        floatingActionButton = { if(route=="home") FloatingActionButton(onClick={nav.navigate("edit/new")}) { Icon(Icons.Rounded.Add,null) } }
+        containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = {
+            if (route in tabs.map { it.route }) {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 3.dp
+                ) {
+                    tabs.forEach { tab ->
+                        NavigationBarItem(
+                            selected = route == tab.route,
+                            onClick = {
+                                nav.navigate(tab.route) {
+                                    popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                            icon = { Icon(tab.icon, null) },
+                            label = { Text(stringResource(tab.label)) },
+                            colors = NavigationBarItemDefaults.colors(
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                            )
+                        )
+                    }
+                }
+            }
+        },
+        floatingActionButton = {
+            if (route == "home") {
+                ExtendedFloatingActionButton(
+                    onClick = { nav.navigate("edit/new") },
+                    icon = { Icon(Icons.Rounded.Add, null) },
+                    text = { Text(if (persian) "یادآور جدید" else "New reminder") }
+                )
+            }
+        }
     ) { padding ->
-        NavHost(nav, startDestination="home", modifier=Modifier.padding(padding), enterTransition={fadeIn()+slideInHorizontally{it/7}}, exitTransition={fadeOut()}, popEnterTransition={fadeIn()+slideInHorizontally{-it/7}}) {
-            composable("home") { HomeScreen(reminders,query,filter,sort,settings.displayMode,persian,viewModel::setQuery,viewModel::setFilter,viewModel::setSort,{nav.navigate("edit/$it")},viewModel::complete) }
-            composable("timeline") { TimelineScreen(reminders,persian){nav.navigate("edit/$it")} }
-            composable("categories") { CategoriesScreen(categories,viewModel::saveCategory,persian) }
-            composable("settings") { SettingsScreen(settings,viewModel::setLanguage,viewModel::setTheme,viewModel::setDisplay,viewModel::setPopup,onDrive,viewModel::syncNow,onExact,onFullScreen) }
+        NavHost(
+            nav,
+            startDestination = "home",
+            modifier = Modifier.padding(padding),
+            enterTransition = { fadeIn() + slideInHorizontally { it / 9 } },
+            exitTransition = { fadeOut() },
+            popEnterTransition = { fadeIn() + slideInHorizontally { -it / 9 } }
+        ) {
+            composable("home") {
+                HomeScreen(
+                    reminders, query, filter, sort, settings.displayMode, persian,
+                    viewModel::setQuery, viewModel::setFilter, viewModel::setSort,
+                    { nav.navigate("edit/$it") }, viewModel::complete
+                )
+            }
+
+            composable("timeline") {
+                TimelineScreen(reminders, persian) { nav.navigate("edit/$it") }
+            }
+
+            composable("categories") {
+                CategoriesScreen(categories, viewModel::saveCategory, persian)
+            }
+
+            composable("settings") {
+                SettingsScreen(
+                    settings = settings,
+                    driveUi = driveUi,
+                    onLanguage = viewModel::setLanguage,
+                    onTheme = viewModel::setTheme,
+                    onDisplay = viewModel::setDisplay,
+                    onPopup = viewModel::setPopup,
+                    onDrive = onDrive,
+                    onSync = viewModel::syncNow,
+                    onDisconnect = viewModel::disconnectDrive,
+                    onExact = onExact,
+                    onFullScreen = onFullScreen
+                )
+            }
+
             composable("edit/{id}") { entry ->
                 val id = entry.arguments?.getString("id")
                 var existing by remember(id) { mutableStateOf<Reminder?>(null) }
-                LaunchedEffect(id) { if(id!="new") existing=viewModel.getReminder(id.orEmpty()) }
-                ReminderEditorScreen(existing,categories,persian,settings.popupReminders,onSave={viewModel.saveReminder(it);nav.popBackStack()},onDelete = existing?.let { reminder -> { viewModel.delete(reminder.id); nav.popBackStack() } },onBack={nav.popBackStack()})
+                LaunchedEffect(id) {
+                    if (id != "new") existing = viewModel.getReminder(id.orEmpty())
+                }
+                ReminderEditorScreen(
+                    existing,
+                    categories,
+                    persian,
+                    settings.popupReminders,
+                    onSave = {
+                        viewModel.saveReminder(it)
+                        nav.popBackStack()
+                    },
+                    onDelete = existing?.let { reminder ->
+                        {
+                            viewModel.delete(reminder.id)
+                            nav.popBackStack()
+                        }
+                    },
+                    onBack = { nav.popBackStack() }
+                )
             }
         }
     }
