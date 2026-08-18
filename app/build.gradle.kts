@@ -9,6 +9,10 @@ plugins {
     alias(libs.plugins.hilt.android)
 }
 
+val enableStandaloneAbiSplits = providers.gradleProperty("shamsaStandaloneAbiSplits")
+    .map { it.toBooleanStrict() }
+    .orElse(true)
+
 android {
     namespace = "com.marble.shamsa"
     compileSdk = 36
@@ -55,9 +59,12 @@ android {
         }
     }
 
+    // Standalone multi-APK ABI splits are useful for GitHub release APKs,
+    // but must be disabled for bundleRelease to avoid AGP/R8 multi-output
+    // shrunk-resource collisions (Google issue 402800800).
     splits {
         abi {
-            isEnable = true
+            isEnable = enableStandaloneAbiSplits.get()
             reset()
             include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
             isUniversalApk = true

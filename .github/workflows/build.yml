@@ -184,11 +184,11 @@ jobs:
       - name: Android lint
         run: gradle --no-daemon :app:lintRelease
 
-      # AGP/R8 can collide when ABI-split APK shrinking and AAB shrinking share
-      # the same release task graph/intermediates. Build and preserve APKs first,
-      # then clean those intermediates before creating the bundle.
+      # Keep standalone ABI APK splits for assembleRelease only.
+      # bundleRelease explicitly disables those splits and bypasses Gradle caches
+      # so AGP/R8 cannot restore or regenerate multi-APK shrunk-resource outputs.
       - name: Build signed split APKs
-        run: gradle --no-daemon :app:assembleRelease
+        run: gradle --no-daemon -PshamsaStandaloneAbiSplits=true :app:assembleRelease
 
       - name: Verify APK signatures
         shell: bash
@@ -228,7 +228,7 @@ jobs:
         run: gradle --no-daemon :app:clean
 
       - name: Build signed AAB
-        run: gradle --no-daemon :app:bundleRelease
+        run: gradle --no-daemon --no-build-cache --no-configuration-cache -PshamsaStandaloneAbiSplits=false :app:bundleRelease
 
       - name: Collect bundle and release metadata
         shell: bash
