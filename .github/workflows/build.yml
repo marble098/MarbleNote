@@ -184,8 +184,11 @@ jobs:
       - name: Android lint
         run: gradle --no-daemon :app:lintRelease
 
-      - name: Build signed APKs and AAB
-        run: gradle --no-daemon :app:assembleRelease :app:bundleRelease
+      # AGP/R8 can collide when ABI-split APK shrinking and AAB shrinking share
+      # the same release task graph/intermediates. Build and preserve APKs first,
+      # then clean those intermediates before creating the bundle.
+      - name: Build signed split APKs
+        run: gradle --no-daemon :app:assembleRelease
 
       - name: Verify APK signatures
         shell: bash
@@ -193,23 +196,53 @@ jobs:
           set -euo pipefail
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
           test -x "$APKSIGNER"
+          apk_count=0
           while IFS= read -r -d '' apk; do
             "$APKSIGNER" verify --verbose --print-certs "$apk"
+            apk_count=$((apk_count + 1))
           done < <(find app/build/outputs/apk/release -type f -name '*.apk' -print0)
+          test "$apk_count" -gt 0 || {
+            echo "::error::assembleRelease produced no release APKs"
+            exit 1
+          }
+          echo "Verified $apk_count signed release APK(s)."
 
-      - name: Collect deliverables
+      - name: Stage signed APKs
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
-          find app/build/outputs/apk/release -type f -name '*.apk' -print0 | while IFS= read -r -d '' f; do
+          apk_count=0
+          while IFS= read -r -d '' f; do
             base="$(basename "$f")"
             cp "$f" "dist/Shamsa-${SHAMSA_VERSION_NAME}-${base#app-}"
-          done
+            apk_count=$((apk_count + 1))
+          done < <(find app/build/outputs/apk/release -type f -name '*.apk' -print0)
+          test "$apk_count" -gt 0 || {
+            echo "::error::No release APKs were available to stage"
+            exit 1
+          }
+          echo "Staged $apk_count APK(s) outside app/build."
+
+      - name: Clean APK build intermediates before AAB
+        run: gradle --no-daemon :app:clean
+
+      - name: Build signed AAB
+        run: gradle --no-daemon :app:bundleRelease
+
+      - name: Collect bundle and release metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          test -f app/build/outputs/bundle/release/app-release.aab || {
+            echo "::error::bundleRelease produced no AAB"
+            exit 1
+          }
           cp app/build/outputs/bundle/release/app-release.aab "dist/Shamsa-${SHAMSA_VERSION_NAME}.aab"
           printf '%s\n' "$SHAMSA_RELEASE_SHA1" > "dist/RELEASE-CERT-SHA1.txt"
-          (cd dist && sha256sum * > SHA256SUMS.txt)
           git archive --format=zip --output="dist/Shamsa-${SHAMSA_VERSION_NAME}-source.zip" HEAD
+          (cd dist && sha256sum -- * > SHA256SUMS.txt)
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
