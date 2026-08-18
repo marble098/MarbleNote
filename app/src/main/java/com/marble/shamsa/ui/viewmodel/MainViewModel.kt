@@ -10,9 +10,16 @@ import com.marble.shamsa.core.cloud.SyncResult
 import com.marble.shamsa.core.data.*
 import com.marble.shamsa.core.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+data class DriveUiState(
+    val working: Boolean = false,
+    val message: String? = null,
+    val successful: Boolean = false
+)
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -32,6 +39,8 @@ class MainViewModel @Inject constructor(
     val sort = _sort.asStateFlow()
     private val _syncState = MutableStateFlow<SyncResult?>(null)
     val syncState = _syncState.asStateFlow()
+    private val _driveUi = MutableStateFlow(DriveUiState())
+    val driveUi = _driveUi.asStateFlow()
 
     fun setQuery(v: String) { _query.value = v }
     fun setFilter(v: ReminderFilter) { _filter.value = v }
@@ -48,9 +57,58 @@ class MainViewModel @Inject constructor(
     fun setPopup(v: Boolean) = viewModelScope.launch { settingsStore.setPopup(v) }
     fun finishOnboarding() = viewModelScope.launch { settingsStore.setOnboardingComplete(true) }
 
-    suspend fun beginDriveAuthorization(activity: Activity): AuthorizationResult = drive.beginAuthorization(activity)
-    fun authorizationFromIntent(activity: Activity, data: Intent?): AuthorizationResult? = drive.authorizationFromIntent(activity, data)
-    fun acceptAuthorization(result: AuthorizationResult) = viewModelScope.launch { _syncState.value = drive.acceptAuthorization(result) }
-    fun syncNow() = viewModelScope.launch { _syncState.value = drive.syncCached() }
-    fun disconnectDrive() = viewModelScope.launch { drive.disconnect() }
+    fun driveAuthorizationStarted() {
+        _driveUi.value = DriveUiState(working = true)
+    }
+
+    fun driveAuthorizationCancelled() {
+        _driveUi.value = DriveUiState(message = "Google Drive authorization was cancelled.")
+    }
+
+    fun driveAuthorizationFailed(error: Throwable) {
+        _driveUi.value = DriveUiState(message = drive.describeAuthorizationError(error))
+    }
+
+    suspend fun beginDriveAuthorization(activity: Activity): AuthorizationResult =
+        drive.beginAuthorization(activity)
+
+    fun authorizationFromIntent(activity: Activity, data: Intent?): AuthorizationResult? =
+        drive.authorizationFromIntent(activity, data)
+
+    fun acceptAuthorization(result: AuthorizationResult) = viewModelScope.launch {
+        _driveUi.value = DriveUiState(working = true)
+        presentDriveResult(drive.acceptAuthorization(result))
+    }
+
+    fun syncNow() = viewModelScope.launch {
+        _driveUi.value = DriveUiState(working = true)
+        presentDriveResult(drive.syncCached())
+    }
+
+    fun disconnectDrive() = viewModelScope.launch {
+        _driveUi.value = DriveUiState(working = true)
+        try {
+            drive.disconnect()
+            _syncState.value = null
+            _driveUi.value = DriveUiState(message = "Google Drive disconnected.")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            _driveUi.value = DriveUiState(message = drive.describeAuthorizationError(t))
+        }
+    }
+
+    private fun presentDriveResult(result: SyncResult) {
+        _syncState.value = result
+        _driveUi.value = when (result) {
+            SyncResult.Success -> DriveUiState(
+                message = "Google Drive is connected and your reminders are synced.",
+                successful = true
+            )
+            SyncResult.NeedsAuthorization -> DriveUiState(
+                message = "Google Drive authorization is required. Tap Connect / Reconnect."
+            )
+            is SyncResult.Failure -> DriveUiState(message = result.message)
+        }
+    }
 }

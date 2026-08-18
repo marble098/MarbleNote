@@ -69,23 +69,23 @@ fun ReminderEditorScreen(
             OutlinedTextField(title, { title = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.title)) }, singleLine = true)
             OutlinedTextField(notes, { notes = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.notes)) }, minLines = 2)
 
-            Text(stringResource(R.string.date), style = MaterialTheme.typography.titleMedium)
+            Text("📅 " + stringResource(R.string.date), style = MaterialTheme.typography.titleMedium)
             JalaliDateStepper(year, month, day, persian, { year = it }, { month = it; day = day.coerceAtMost(JalaliCalendar.daysInMonth(year, it)) }, { day = it })
-            Text(stringResource(R.string.time), style = MaterialTheme.typography.titleMedium)
+            Text("⏰ " + stringResource(R.string.time), style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 NumberStepper(hour, 0, 23, { hour = it }, Modifier.weight(1f), "%02d")
                 Text(":", style = MaterialTheme.typography.headlineMedium)
                 NumberStepper(minute, 0, 59, { minute = it }, Modifier.weight(1f), "%02d")
             }
 
-            Text(stringResource(R.string.priority), style = MaterialTheme.typography.titleMedium)
+            Text("⚡ " + stringResource(R.string.priority), style = MaterialTheme.typography.titleMedium)
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ReminderPriority.entries.forEach { p ->
                     FilterChip(selected = p == priority, onClick = { priority = p }, label = { Text(priorityLabel(p, persian)) })
                 }
             }
 
-            Text(if (persian) "دسته‌بندی" else "Category", style = MaterialTheme.typography.titleMedium)
+            Text(if (persian) "🗂️ دسته‌بندی" else "🗂️ Category", style = MaterialTheme.typography.titleMedium)
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = categoryId == null, onClick = { categoryId = null }, label = { Text(if (persian) "بدون دسته" else "None") })
                 categories.forEach { category ->
@@ -98,7 +98,7 @@ fun ReminderEditorScreen(
                 }
             }
 
-            Text(if (persian) "آیکن" else "Icon", style = MaterialTheme.typography.titleMedium)
+            Text(if (persian) "✨ آیکن" else "✨ Icon", style = MaterialTheme.typography.titleMedium)
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 IconCatalog.reminderKeys.forEach { key ->
                     FilterChip(
@@ -109,7 +109,7 @@ fun ReminderEditorScreen(
                 }
             }
 
-            Text(if (persian) "رنگ و گرادیان" else "Color & gradient", style = MaterialTheme.typography.titleMedium)
+            Text(if (persian) "🎨 رنگ و گرادیان" else "🎨 Color & gradient", style = MaterialTheme.typography.titleMedium)
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 AccentPresets.values.forEach { argb ->
                     val selected = color == argb

@@ -20,6 +20,7 @@ import com.marble.shamsa.ui.ShamsaAppNav
 import com.marble.shamsa.ui.onboarding.OnboardingScreen
 import com.marble.shamsa.ui.viewmodel.MainViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -27,49 +28,85 @@ import javax.inject.Inject
 class MainActivity : AppCompatActivity() {
     @Inject lateinit var scheduler: ReminderScheduler
 
-    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    private val notificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             val vm: MainViewModel = hiltViewModel()
             val settings by vm.settings.collectAsStateWithLifecycle()
+            val driveUi by vm.driveUi.collectAsStateWithLifecycle()
             val scope = rememberCoroutineScope()
-            val driveResolution = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-                if (result.resultCode == Activity.RESULT_OK) {
-                    vm.authorizationFromIntent(this, result.data)?.let(vm::acceptAuthorization)
+
+            val driveResolution =
+                rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+                    if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+                        try {
+                            val authorization = vm.authorizationFromIntent(this, result.data)
+                            if (authorization != null) {
+                                vm.acceptAuthorization(authorization)
+                            } else {
+                                vm.driveAuthorizationFailed(
+                                    IllegalStateException("Google returned an empty authorization result.")
+                                )
+                            }
+                        } catch (t: Throwable) {
+                            vm.driveAuthorizationFailed(t)
+                        }
+                    } else {
+                        vm.driveAuthorizationCancelled()
+                    }
                 }
-            }
 
             fun connectDrive() {
                 scope.launch {
-                    runCatching { vm.beginDriveAuthorization(this@MainActivity) }.onSuccess { result ->
+                    vm.driveAuthorizationStarted()
+                    try {
+                        val result = vm.beginDriveAuthorization(this@MainActivity)
                         val pending = result.pendingIntent
-                        if (pending != null) driveResolution.launch(IntentSenderRequest.Builder(pending).build()) else vm.acceptAuthorization(result)
+                        if (pending != null) {
+                            driveResolution.launch(IntentSenderRequest.Builder(pending).build())
+                        } else if (result.accessToken != null) {
+                            vm.acceptAuthorization(result)
+                        } else {
+                            vm.driveAuthorizationFailed(
+                                IllegalStateException("Google authorization returned neither a token nor a resolution.")
+                            )
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (t: Throwable) {
+                        vm.driveAuthorizationFailed(t)
                     }
                 }
             }
 
             LaunchedEffect(settings.language) {
-                AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(settings.language))
-            }
-
-            LaunchedEffect(settings.driveConnected) {
-                if (settings.driveConnected) {
-                    runCatching { vm.beginDriveAuthorization(this@MainActivity) }.getOrNull()?.let { result ->
-                        if (result.pendingIntent == null && result.accessToken != null) vm.acceptAuthorization(result)
-                    }
-                }
+                AppCompatDelegate.setApplicationLocales(
+                    LocaleListCompat.forLanguageTags(settings.language)
+                )
             }
 
             ShamsaTheme(settings.themeMode) {
                 if (!settings.onboardingComplete) {
                     OnboardingScreen(
                         currentLanguage = settings.language,
+                        driveUi = driveUi,
                         onLanguage = vm::setLanguage,
-                        onNotifications = { if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS) },
-                        onExactAlarm = { runCatching { startActivity(scheduler.exactAlarmSettingsIntent()) } },
-                        onFullScreen = { scheduler.fullScreenSettingsIntent()?.let { runCatching { startActivity(it) } } },
+                        onNotifications = {
+                            if (Build.VERSION.SDK_INT >= 33) {
+                                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        },
+                        onExactAlarm = {
+                            runCatching { startActivity(scheduler.exactAlarmSettingsIntent()) }
+                        },
+                        onFullScreen = {
+                            scheduler.fullScreenSettingsIntent()?.let {
+                                runCatching { startActivity(it) }
+                            }
+                        },
                         onDrive = ::connectDrive,
                         onFinish = vm::finishOnboarding
                     )
@@ -78,8 +115,14 @@ class MainActivity : AppCompatActivity() {
                         settings = settings,
                         viewModel = vm,
                         onDrive = ::connectDrive,
-                        onExact = { runCatching { startActivity(scheduler.exactAlarmSettingsIntent()) } },
-                        onFullScreen = { scheduler.fullScreenSettingsIntent()?.let { runCatching { startActivity(it) } } },
+                        onExact = {
+                            runCatching { startActivity(scheduler.exactAlarmSettingsIntent()) }
+                        },
+                        onFullScreen = {
+                            scheduler.fullScreenSettingsIntent()?.let {
+                                runCatching { startActivity(it) }
+                            }
+                        },
                         initialReminderId = intent.getStringExtra(ReminderScheduler.EXTRA_ID)
                     )
                 }

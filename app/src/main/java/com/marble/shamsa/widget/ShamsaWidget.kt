@@ -38,42 +38,66 @@ class ShamsaWidget : GlanceAppWidget() {
                 Column(
                     modifier = GlanceModifier
                         .fillMaxSize()
-                        .background(Color(0xFF201A32))
+                        .background(Color(0xFF18132B))
                         .padding(16.dp),
                     verticalAlignment = Alignment.Vertical.Top
                 ) {
-                    Text(
-                        if (persian) "شمسا" else "Shamsa",
-                        style = TextStyle(
-                            color = GlanceTheme.colors.primary,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
+                    Row(GlanceModifier.fillMaxWidth()) {
+                        Text("☀️", style = TextStyle(fontSize = 20.sp))
+                        Spacer(GlanceModifier.width(8.dp))
+                        Text(
+                            if (persian) "شمسا" else "Shamsa",
+                            modifier = GlanceModifier.defaultWeight(),
+                            style = TextStyle(
+                                color = GlanceTheme.colors.primary,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         )
-                    )
+                        Text("✨", style = TextStyle(fontSize = 16.sp))
+                    }
+
                     Spacer(GlanceModifier.height(10.dp))
 
                     if (reminders.isEmpty()) {
                         Text(
-                            if (persian) "یادآور نزدیکی نیست" else "No upcoming reminders",
-                            style = TextStyle(color = GlanceTheme.colors.onSurface)
+                            if (persian) "🌱 فعلاً یادآور نزدیکی نیست" else "🌱 Nothing urgent right now",
+                            style = TextStyle(
+                                color = GlanceTheme.colors.onSurface,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
                         )
                     }
 
-                    reminders.forEach { reminder ->
+                    reminders.forEachIndexed { index, reminder ->
+                        if (index > 0) Spacer(GlanceModifier.height(4.dp))
                         Row(GlanceModifier.fillMaxWidth().padding(vertical = 5.dp)) {
+                            Text(
+                                if (index == 0) "●" else "•",
+                                style = TextStyle(
+                                    color = if (index == 0) GlanceTheme.colors.secondary else GlanceTheme.colors.tertiary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                            Spacer(GlanceModifier.width(7.dp))
                             Text(
                                 reminder.title,
                                 modifier = GlanceModifier.defaultWeight(),
                                 style = TextStyle(
                                     color = GlanceTheme.colors.onSurface,
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium
                                 ),
                                 maxLines = 1
                             )
+                            Spacer(GlanceModifier.width(6.dp))
                             Text(
                                 CountdownFormatter.compact(reminder.dueAtMillis, persian = persian),
                                 style = TextStyle(
-                                    color = GlanceTheme.colors.secondary,
+                                    color = GlanceTheme.colors.primary,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             )
