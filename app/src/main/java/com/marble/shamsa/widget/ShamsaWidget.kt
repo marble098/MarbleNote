@@ -2,6 +2,8 @@ package com.marble.shamsa.widget
 
 import android.content.Context
 import android.content.res.Configuration
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -12,6 +14,7 @@ import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.layout.*
+import androidx.glance.material3.ColorProviders
 import androidx.glance.text.*
 import com.marble.shamsa.core.data.ReminderRepository
 import com.marble.shamsa.core.data.SettingsStore
@@ -37,10 +40,52 @@ private data class WidgetPalette(
     val background: Color,
     val card: Color,
     val featured: Color,
-    val text: Color,
-    val muted: Color,
     val primary: Color,
     val track: Color
+)
+
+private val WidgetLightColors = lightColorScheme(
+    primary = Color(0xFF2457D6),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFEAF0FF),
+    onPrimaryContainer = Color(0xFF102B66),
+    secondary = Color(0xFF0D9488),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFDDF7F2),
+    onSecondaryContainer = Color(0xFF0B4F49),
+    tertiary = Color(0xFFE58A00),
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFFFF1CF),
+    onTertiaryContainer = Color(0xFF684200),
+    background = Color(0xFFF7F8FC),
+    onBackground = Color(0xFF172033),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF172033),
+    surfaceVariant = Color(0xFFEEF1F6),
+    onSurfaceVariant = Color(0xFF667085),
+    outline = Color(0xFFCBD5E1)
+)
+
+private val WidgetDarkColors = darkColorScheme(
+    primary = Color(0xFF91B2FF),
+    onPrimary = Color(0xFF08265D),
+    primaryContainer = Color(0xFF173B7D),
+    onPrimaryContainer = Color(0xFFDCE7FF),
+    secondary = Color(0xFF62DED1),
+    onSecondary = Color(0xFF003D38),
+    secondaryContainer = Color(0xFF0D514B),
+    onSecondaryContainer = Color(0xFFD3FBF6),
+    tertiary = Color(0xFFFFC861),
+    onTertiary = Color(0xFF4B3000),
+    tertiaryContainer = Color(0xFF664500),
+    onTertiaryContainer = Color(0xFFFFE3A7),
+    background = Color(0xFF0B1220),
+    onBackground = Color(0xFFF5F7FB),
+    surface = Color(0xFF111827),
+    onSurface = Color(0xFFF5F7FB),
+    surfaceVariant = Color(0xFF1F2937),
+    onSurfaceVariant = Color(0xFFAAB6C8),
+    outline = Color(0xFF566273)
 )
 
 class ShamsaWidget : GlanceAppWidget() {
@@ -74,8 +119,6 @@ class ShamsaWidget : GlanceAppWidget() {
                     background = Color(0xFF0B1220),
                     card = Color(0xFF151E2E),
                     featured = Color(0xFF17284A),
-                    text = Color(0xFFF5F7FB),
-                    muted = Color(0xFFAAB6C8),
                     primary = Color(0xFF91B2FF),
                     track = Color(0xFF2A3648)
                 )
@@ -84,98 +127,104 @@ class ShamsaWidget : GlanceAppWidget() {
                     background = Color(0xFFF7F8FC),
                     card = Color(0xFFFFFFFF),
                     featured = Color(0xFFEEF4FF),
-                    text = Color(0xFF172033),
-                    muted = Color(0xFF667085),
                     primary = Color(0xFF2457D6),
                     track = Color(0xFFDDE4EE)
                 )
             }
 
+        val glanceColors = ColorProviders(
+            if (dark) WidgetDarkColors else WidgetLightColors
+        )
+
         provideContent {
-            Column(
-                modifier = GlanceModifier
-                    .fillMaxSize()
-                    .background(palette.background)
-                    .padding(14.dp),
-                verticalAlignment = Alignment.Vertical.Top
-            ) {
-                Row(
-                    modifier = GlanceModifier.fillMaxWidth()
+            GlanceTheme(colors = glanceColors) {
+                Column(
+                    modifier = GlanceModifier
+                        .fillMaxSize()
+                        .background(palette.background)
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.Vertical.Top
                 ) {
-                    Text(
-                        if (persian) "شمسا" else "Shamsa",
-                        modifier = GlanceModifier.defaultWeight(),
-                        style = TextStyle(
-                            color = palette.text,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-
-                    Text(
-                        if (persian)
-                            "زمانِ پیش‌رو"
-                        else
-                            "UP NEXT",
-                        style = TextStyle(
-                            color = palette.primary,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    )
-                }
-
-                Spacer(GlanceModifier.height(9.dp))
-
-                if (reminders.isEmpty()) {
-                    Column(
-                        modifier = GlanceModifier
-                            .fillMaxWidth()
-                            .background(palette.card)
-                            .padding(12.dp)
+                    Row(
+                        modifier = GlanceModifier.fillMaxWidth()
                     ) {
                         Text(
-                            if (persian)
-                                "فعلاً چیزی نزدیک نیست"
-                            else
-                                "Nothing close right now",
+                            if (persian) "شمسا" else "Shamsa",
+                            modifier = GlanceModifier.defaultWeight(),
                             style = TextStyle(
-                                color = palette.text,
-                                fontSize = 13.sp,
+                                color = GlanceTheme.colors.onSurface,
+                                fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         )
-                        Spacer(GlanceModifier.height(4.dp))
+
                         Text(
                             if (persian)
-                                "فضایت خلوت است."
+                                "زمانِ پیش‌رو"
                             else
-                                "Your timeline is clear.",
+                                "UP NEXT",
                             style = TextStyle(
-                                color = palette.muted,
-                                fontSize = 11.sp
+                                color = GlanceTheme.colors.primary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium
                             )
                         )
                     }
-                }
 
-                reminders.forEachIndexed { index, reminder ->
-                    if (index > 0) {
-                        Spacer(GlanceModifier.height(7.dp))
+                    Spacer(GlanceModifier.height(9.dp))
+
+                    if (reminders.isEmpty()) {
+                        Column(
+                            modifier = GlanceModifier
+                                .fillMaxWidth()
+                                .background(palette.card)
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                if (persian)
+                                    "فعلاً چیزی نزدیک نیست"
+                                else
+                                    "Nothing close right now",
+                                style = TextStyle(
+                                    color = GlanceTheme.colors.onSurface,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+
+                            Spacer(GlanceModifier.height(4.dp))
+
+                            Text(
+                                if (persian)
+                                    "فضایت خلوت است."
+                                else
+                                    "Your timeline is clear.",
+                                style = TextStyle(
+                                    color = GlanceTheme.colors.onSurfaceVariant,
+                                    fontSize = 11.sp
+                                )
+                            )
+                        }
                     }
 
-                    WidgetReminder(
-                        reminder = reminder,
-                        now = now,
-                        persian = persian,
-                        style =
-                            if (index == 0)
-                                appSettings.countdownStyle
-                            else
-                                CountdownStyle.COMPACT,
-                        palette = palette,
-                        featured = index == 0
-                    )
+                    reminders.forEachIndexed { index, reminder ->
+                        if (index > 0) {
+                            Spacer(GlanceModifier.height(7.dp))
+                        }
+
+                        WidgetReminder(
+                            reminder = reminder,
+                            now = now,
+                            persian = persian,
+                            style =
+                                if (index == 0)
+                                    appSettings.countdownStyle
+                                else
+                                    CountdownStyle.COMPACT,
+                            palette = palette,
+                            featured = index == 0
+                        )
+                    }
                 }
             }
         }
@@ -215,9 +264,9 @@ private fun WidgetReminder(
                 style = TextStyle(
                     color =
                         if (featured)
-                            palette.primary
+                            GlanceTheme.colors.primary
                         else
-                            Color(reminder.colorArgb),
+                            GlanceTheme.colors.secondary,
                     fontSize = 10.sp
                 )
             )
@@ -228,7 +277,7 @@ private fun WidgetReminder(
                 reminder.title,
                 modifier = GlanceModifier.defaultWeight(),
                 style = TextStyle(
-                    color = palette.text,
+                    color = GlanceTheme.colors.onSurface,
                     fontSize =
                         if (featured) 14.sp else 12.sp,
                     fontWeight = FontWeight.Bold
@@ -250,8 +299,7 @@ private fun WidgetReminder(
             dueAtMillis = reminder.dueAtMillis,
             now = now,
             persian = persian,
-            style = style,
-            palette = palette
+            style = style
         )
     }
 }
@@ -280,7 +328,7 @@ private fun WidgetProgressStrip(
                         else
                             palette.track
                     )
-            )
+            ) {}
 
             if (index < count - 1) {
                 Spacer(GlanceModifier.width(3.dp))
@@ -294,8 +342,7 @@ private fun WidgetCountdown(
     dueAtMillis: Long,
     now: Long,
     persian: Boolean,
-    style: CountdownStyle,
-    palette: WidgetPalette
+    style: CountdownStyle
 ) {
     when (style) {
         CountdownStyle.COMPACT -> {
@@ -306,7 +353,7 @@ private fun WidgetCountdown(
                     persian
                 ),
                 style = TextStyle(
-                    color = palette.primary,
+                    color = GlanceTheme.colors.primary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -321,7 +368,7 @@ private fun WidgetCountdown(
                     persian
                 ),
                 style = TextStyle(
-                    color = palette.primary,
+                    color = GlanceTheme.colors.primary,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -336,7 +383,7 @@ private fun WidgetCountdown(
                     persian
                 ),
                 style = TextStyle(
-                    color = palette.primary,
+                    color = GlanceTheme.colors.primary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -351,11 +398,12 @@ private fun WidgetCountdown(
                     persian
                 ),
                 style = TextStyle(
-                    color = palette.primary,
+                    color = GlanceTheme.colors.primary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
             )
+
             Text(
                 CountdownFormatter.focusSecondary(
                     dueAtMillis,
@@ -363,7 +411,7 @@ private fun WidgetCountdown(
                     persian
                 ),
                 style = TextStyle(
-                    color = palette.muted,
+                    color = GlanceTheme.colors.onSurfaceVariant,
                     fontSize = 9.sp
                 )
             )
@@ -381,7 +429,11 @@ private fun reminderProgress(
     val remaining =
         (reminder.dueAtMillis - now)
             .coerceIn(0L, total)
-    return (remaining.toDouble() / total.toDouble())
+
+    return (
+        remaining.toDouble() /
+            total.toDouble()
+        )
         .toFloat()
         .coerceIn(0f, 1f)
 }
