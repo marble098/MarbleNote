@@ -20,9 +20,20 @@ data class ReminderEntity(
     val updatedAtMillis: Long,
     val deletedAtMillis: Long?
 ) {
-    fun toModel() = Reminder(id, title, notes, dueAtMillis, ReminderPriority.entries.first { it.level == priority }, categoryId, icon, colorArgb, ReminderStatus.valueOf(status), popupEnabled, createdAtMillis, updatedAtMillis, deletedAtMillis)
+    fun toModel() = Reminder(
+        id, title, notes, dueAtMillis,
+        ReminderPriority.entries.first { it.level == priority },
+        categoryId, icon, colorArgb, ReminderStatus.valueOf(status),
+        popupEnabled, createdAtMillis, updatedAtMillis, deletedAtMillis
+    )
+
     companion object {
-        fun fromModel(v: Reminder) = ReminderEntity(v.id, v.title, v.notes, v.dueAtMillis, v.priority.level, v.categoryId, v.icon, v.colorArgb, v.status.name, v.popupEnabled, v.createdAtMillis, v.updatedAtMillis, v.deletedAtMillis)
+        fun fromModel(v: Reminder) = ReminderEntity(
+            v.id, v.title, v.notes, v.dueAtMillis, v.priority.level,
+            v.categoryId, v.icon, v.colorArgb, v.status.name,
+            v.popupEnabled, v.createdAtMillis, v.updatedAtMillis,
+            v.deletedAtMillis
+        )
     }
 }
 
@@ -36,6 +47,50 @@ data class CategoryEntity(
     val updatedAtMillis: Long,
     val deletedAtMillis: Long?
 ) {
-    fun toModel() = Category(id, name, icon, colorArgb, createdAtMillis, updatedAtMillis, deletedAtMillis)
-    companion object { fun fromModel(v: Category) = CategoryEntity(v.id, v.name, v.icon, v.colorArgb, v.createdAtMillis, v.updatedAtMillis, v.deletedAtMillis) }
+    fun toModel() = Category(
+        id, name, icon, colorArgb, createdAtMillis, updatedAtMillis, deletedAtMillis
+    )
+
+    companion object {
+        fun fromModel(v: Category) = CategoryEntity(
+            v.id, v.name, v.icon, v.colorArgb,
+            v.createdAtMillis, v.updatedAtMillis, v.deletedAtMillis
+        )
+    }
+}
+
+@Entity(tableName = "notes")
+data class NoteEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val body: String,
+    val colorArgb: Long,
+    val pinned: Boolean,
+    val createdAtMillis: Long,
+    val updatedAtMillis: Long,
+    val deletedAtMillis: Long?
+) {
+    fun toModel() = Note(
+        id = id,
+        title = title,
+        body = body,
+        colorArgb = colorArgb,
+        pinned = pinned,
+        createdAtMillis = createdAtMillis,
+        updatedAtMillis = updatedAtMillis,
+        deletedAtMillis = deletedAtMillis
+    )
+
+    companion object {
+        fun fromModel(v: Note) = NoteEntity(
+            id = v.id,
+            title = v.title,
+            body = v.body,
+            colorArgb = v.colorArgb,
+            pinned = v.pinned,
+            createdAtMillis = v.createdAtMillis,
+            updatedAtMillis = v.updatedAtMillis,
+            deletedAtMillis = v.deletedAtMillis
+        )
+    }
 }

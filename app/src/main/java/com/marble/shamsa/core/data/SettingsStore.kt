@@ -27,7 +27,9 @@ data class AppSettings(
 )
 
 @Singleton
-class SettingsStore @Inject constructor(@ApplicationContext private val context: Context) {
+class SettingsStore @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
     private object Keys {
         val onboarding = booleanPreferencesKey("onboarding")
         val language = stringPreferencesKey("language")
@@ -53,7 +55,9 @@ class SettingsStore @Inject constructor(@ApplicationContext private val context:
                 DisplayMode.valueOf(p[Keys.display] ?: DisplayMode.CARDS.name)
             }.getOrDefault(DisplayMode.CARDS),
             countdownStyle = runCatching {
-                CountdownStyle.valueOf(p[Keys.countdownStyle] ?: CountdownStyle.SEGMENTS.name)
+                CountdownStyle.valueOf(
+                    p[Keys.countdownStyle] ?: CountdownStyle.SEGMENTS.name
+                )
             }.getOrDefault(CountdownStyle.SEGMENTS),
             popupReminders = p[Keys.popup] ?: true,
             driveConnected = p[Keys.driveConnected] ?: false
@@ -88,11 +92,19 @@ class SettingsStore @Inject constructor(@ApplicationContext private val context:
         val p = context.dataStore.data.first()
         val token = p[Keys.driveToken]
         val at = p[Keys.driveTokenAt] ?: 0L
-        return token?.takeIf { System.currentTimeMillis() - at < 45 * 60_000L }
+        return token?.takeIf {
+            System.currentTimeMillis() - at < 45 * 60_000L
+        }
     }
 
     suspend fun storedDriveToken(): String? =
         context.dataStore.data.first()[Keys.driveToken]
+
+    // Expired access tokens are disposable; the OAuth grant may still be valid.
+    suspend fun clearDriveToken() = context.dataStore.edit {
+        it.remove(Keys.driveToken)
+        it.remove(Keys.driveTokenAt)
+    }
 
     suspend fun clearDrive() = context.dataStore.edit {
         it.remove(Keys.driveToken)
@@ -104,11 +116,15 @@ class SettingsStore @Inject constructor(@ApplicationContext private val context:
         var result = ""
         context.dataStore.edit { p ->
             result = p[Keys.deviceId]
-                ?: UUID.randomUUID().toString().also { p[Keys.deviceId] = it }
+                ?: UUID.randomUUID().toString().also {
+                    p[Keys.deviceId] = it
+                }
         }
         return result
     }
 
     suspend fun markSynced() =
-        context.dataStore.edit { it[Keys.lastSync] = System.currentTimeMillis() }
+        context.dataStore.edit {
+            it[Keys.lastSync] = System.currentTimeMillis()
+        }
 }

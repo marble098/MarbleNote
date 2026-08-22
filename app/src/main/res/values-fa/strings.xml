@@ -5,6 +5,7 @@
     <string name="notification_channel_reminders_desc">هشدار زمان رسیدن یادآورها</string>
     <string name="notification_channel_sync">همگام‌سازی ابری</string>
     <string name="home">خانه</string>
+    <string name="notes_tab">یادداشت‌ها</string>
     <string name="timeline">زمان‌بندی</string>
     <string name="categories">دسته‌ها</string>
     <string name="settings">تنظیمات</string>
@@ -33,7 +34,7 @@
     <string name="sync_now">همگام‌سازی</string>
     <string name="permissions">مجوزهای یادآوری</string>
     <string name="onboarding_welcome">زمانت را برعکس ببین.</string>
-    <string name="onboarding_subtitle">یادآورهای شمسی، شمارش‌معکوس زیبا و پشتیبان امن درایو.</string>
+    <string name="onboarding_subtitle">یادآورهای شمسی، یادداشت‌های سریع، شمارش‌معکوس زیبا و پشتیبان امن درایو.</string>
     <string name="continue_label">ادامه</string>
     <string name="get_started">شروع شمسا</string>
     <string name="choose_language">زبان را انتخاب کن</string>
@@ -41,7 +42,7 @@
     <string name="allow_notifications">اجازه اعلان</string>
     <string name="allow_exact_alarms">اجازه آلارم دقیق</string>
     <string name="allow_fullscreen">اجازه یادآور تمام‌صفحه</string>
-    <string name="cloud_explain">با اتصال درایو، بعد از نصب دوباره برنامه یادآورهایت برمی‌گردند.</string>
+    <string name="cloud_explain">با اتصال درایو، بعد از نصب دوباره برنامه یادآورها و یادداشت‌هایت برمی‌گردند.</string>
     <string name="skip">فعلاً رد شود</string>
     <string name="filter_all">همه</string>
     <string name="filter_today">امروز</string>

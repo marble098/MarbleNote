@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.sp
 import com.marble.shamsa.R
 import com.marble.shamsa.core.model.ThemeMode
 
-// SHAMSA_DESIGN_V3
+// SHAMSA_DESIGN_V5_SOFT_GEOMETRY
 val VazirmatnFontFamily = FontFamily(
     Font(R.font.vazirmatn_regular, FontWeight.Normal),
     Font(R.font.vazirmatn_medium, FontWeight.Medium),
@@ -25,52 +25,56 @@ val VazirmatnFontFamily = FontFamily(
 )
 
 private val Light = lightColorScheme(
-    primary = Color(0xFF5B3FD6),
+    primary = Color(0xFF5843D8),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFE8E0FF),
+    primaryContainer = Color(0xFFE8E2FF),
     onPrimaryContainer = Color(0xFF21105D),
-    secondary = Color(0xFFD93D78),
+    secondary = Color(0xFFC53F78),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFFFD9E5),
+    secondaryContainer = Color(0xFFFFD9E7),
     onSecondaryContainer = Color(0xFF53102B),
-    tertiary = Color(0xFF008DA7),
+    tertiary = Color(0xFF008A9D),
     onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFC0F0FA),
-    onTertiaryContainer = Color(0xFF003640),
-    background = Color(0xFFFBF9FF),
+    tertiaryContainer = Color(0xFFC3F0F6),
+    onTertiaryContainer = Color(0xFF00363E),
+    background = Color(0xFFFCFAFF),
     onBackground = Color(0xFF1C1B20),
     surface = Color(0xFFFFFBFF),
     onSurface = Color(0xFF1C1B20),
-    surfaceVariant = Color(0xFFF0ECF8),
+    surfaceVariant = Color(0xFFF1EDF7),
     onSurfaceVariant = Color(0xFF49454F),
     outline = Color(0xFF7A7481),
     error = Color(0xFFBA1A1A)
 )
 
 private val Dark = darkColorScheme(
-    primary = Color(0xFFCBBEFF),
+    primary = Color(0xFFCCBEFF),
     onPrimary = Color(0xFF2E167F),
     primaryContainer = Color(0xFF4330A6),
     onPrimaryContainer = Color(0xFFE8E0FF),
-    secondary = Color(0xFFFFB1C8),
+    secondary = Color(0xFFFFB1C9),
     onSecondary = Color(0xFF7D1749),
-    secondaryContainer = Color(0xFF9D2B60),
+    secondaryContainer = Color(0xFF87274F),
     onSecondaryContainer = Color(0xFFFFD9E5),
-    tertiary = Color(0xFF75D6ED),
-    onTertiary = Color(0xFF003640),
-    tertiaryContainer = Color(0xFF00505E),
-    onTertiaryContainer = Color(0xFFC0F0FA),
-    background = Color(0xFF100E17),
-    onBackground = Color(0xFFE8E1EC),
-    surface = Color(0xFF17141F),
-    onSurface = Color(0xFFE8E1EC),
-    surfaceVariant = Color(0xFF2B2733),
-    onSurfaceVariant = Color(0xFFCEC5D3),
+    tertiary = Color(0xFF79D7E7),
+    onTertiary = Color(0xFF00363E),
+    tertiaryContainer = Color(0xFF07515B),
+    onTertiaryContainer = Color(0xFFC3F0F6),
+    background = Color(0xFF100E16),
+    onBackground = Color(0xFFE9E2EC),
+    surface = Color(0xFF17141E),
+    onSurface = Color(0xFFE9E2EC),
+    surfaceVariant = Color(0xFF2B2732),
+    onSurfaceVariant = Color(0xFFCFC5D2),
     outline = Color(0xFF978E9D),
     error = Color(0xFFFFB4AB)
 )
 
-private fun style(weight: FontWeight, size: Int, line: Int) = TextStyle(
+private fun style(
+    weight: FontWeight,
+    size: Int,
+    line: Int
+) = TextStyle(
     fontFamily = VazirmatnFontFamily,
     fontWeight = weight,
     fontSize = size.sp,
@@ -96,20 +100,24 @@ private val AppTypography = Typography(
 )
 
 private val AppShapes = Shapes(
-    extraSmall = RoundedCornerShape(10.dp),
-    small = RoundedCornerShape(14.dp),
-    medium = RoundedCornerShape(20.dp),
-    large = RoundedCornerShape(28.dp),
-    extraLarge = RoundedCornerShape(36.dp)
+    extraSmall = RoundedCornerShape(12.dp),
+    small = RoundedCornerShape(18.dp),
+    medium = RoundedCornerShape(24.dp),
+    large = RoundedCornerShape(30.dp),
+    extraLarge = RoundedCornerShape(38.dp)
 )
 
 @Composable
-fun ShamsaTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> Unit) {
+fun ShamsaTheme(
+    mode: ThemeMode = ThemeMode.SYSTEM,
+    content: @Composable () -> Unit
+) {
     val dark = when (mode) {
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
     }
+
     MaterialTheme(
         colorScheme = if (dark) Dark else Light,
         typography = AppTypography,

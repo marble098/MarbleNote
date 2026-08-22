@@ -5,11 +5,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import com.google.android.gms.auth.api.identity.AuthorizationClient
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.AuthorizationResult
 import com.google.android.gms.auth.api.identity.ClearTokenRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.auth.api.identity.RevokeAccessRequest
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.gms.common.api.Scope
@@ -19,6 +22,7 @@ import com.marble.shamsa.core.model.CloudSnapshot
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -55,6 +59,7 @@ class DriveSyncManager @Inject constructor(
     companion object {
         const val DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata"
         private const val SNAPSHOT_NAME = "shamsa-sync-v1.json"
+        private const val MAX_AUTH_ATTEMPTS = 3
     }
 
     private val authorizationClient by lazy {
@@ -63,14 +68,80 @@ class DriveSyncManager @Inject constructor(
 
     private val requestedScopes = listOf(Scope(DRIVE_SCOPE))
 
-    private fun request() = AuthorizationRequest.builder()
-        .setRequestedScopes(requestedScopes)
-        .build()
+    private fun request(selectAccount: Boolean = false): AuthorizationRequest {
+        val builder = AuthorizationRequest.builder()
+            .setRequestedScopes(requestedScopes)
 
-    suspend fun beginAuthorization(activity: Activity): AuthorizationResult =
-        Identity.getAuthorizationClient(activity)
-            .authorize(request())
-            .await()
+        if (selectAccount) {
+            builder.setPrompt(AuthorizationRequest.Prompt.SELECT_ACCOUNT)
+        }
+        return builder.build()
+    }
+
+    private fun ensurePlayServices() {
+        val code = GoogleApiAvailability.getInstance()
+            .isGooglePlayServicesAvailable(context)
+
+        if (code != ConnectionResult.SUCCESS) {
+            throw IOException(
+                "Google Play services is unavailable or needs attention " +
+                    "(connection code $code)."
+            )
+        }
+    }
+
+    private fun retryableAuthorization(code: Int): Boolean =
+        code == CommonStatusCodes.INTERNAL_ERROR ||
+            code == CommonStatusCodes.NETWORK_ERROR ||
+            code == CommonStatusCodes.CONNECTION_SUSPENDED_DURING_CALL ||
+            code == CommonStatusCodes.RECONNECTION_TIMED_OUT ||
+            code == CommonStatusCodes.RECONNECTION_TIMED_OUT_DURING_UPDATE
+
+    private suspend fun authorizeWithRetry(
+        authClient: AuthorizationClient,
+        authorizationRequest: AuthorizationRequest
+    ): AuthorizationResult {
+        var last: Throwable? = null
+
+        repeat(MAX_AUTH_ATTEMPTS) { attempt ->
+            try {
+                return authClient.authorize(authorizationRequest).await()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: ApiException) {
+                last = e
+                if (!retryableAuthorization(e.statusCode) ||
+                    attempt == MAX_AUTH_ATTEMPTS - 1
+                ) {
+                    throw e
+                }
+                delay(350L * (attempt + 1) * (attempt + 1))
+            } catch (e: Exception) {
+                last = e
+                if (attempt == MAX_AUTH_ATTEMPTS - 1) throw e
+                delay(350L * (attempt + 1) * (attempt + 1))
+            }
+        }
+
+        throw last ?: IOException("Google authorization failed.")
+    }
+
+    suspend fun beginAuthorization(activity: Activity): AuthorizationResult {
+        ensurePlayServices()
+        val activityClient = Identity.getAuthorizationClient(activity)
+
+        return try {
+            authorizeWithRetry(activityClient, request())
+        } catch (e: ApiException) {
+            // One final account-selection attempt can recover stale account state
+            // after repeated INTERNAL_ERROR responses on some Play Services builds.
+            if (e.statusCode == CommonStatusCodes.INTERNAL_ERROR) {
+                activityClient.authorize(request(selectAccount = true)).await()
+            } else {
+                throw e
+            }
+        }
+    }
 
     fun authorizationFromIntent(
         activity: Activity,
@@ -95,9 +166,35 @@ class DriveSyncManager @Inject constructor(
     }
 
     suspend fun syncCached(): SyncResult {
-        val token = settings.cachedDriveToken()
-            ?: return SyncResult.NeedsAuthorization
-        return syncWithToken(token)
+        settings.cachedDriveToken()?.let { cached ->
+            when (val result = syncWithToken(cached)) {
+                SyncResult.NeedsAuthorization -> Unit
+                else -> return result
+            }
+        }
+
+        // A Google access token is short-lived. Refresh silently through the
+        // Authorization API when the user has already granted the scope.
+        return refreshAuthorizationAndSync()
+    }
+
+    private suspend fun refreshAuthorizationAndSync(): SyncResult {
+        return try {
+            ensurePlayServices()
+            val result = authorizeWithRetry(authorizationClient, request())
+            val token = result.accessToken ?: return SyncResult.NeedsAuthorization
+
+            if (result.grantedScopes.none { it == DRIVE_SCOPE }) {
+                return SyncResult.NeedsAuthorization
+            }
+
+            settings.saveDriveToken(token)
+            syncWithToken(token)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            SyncResult.Failure(describeAuthorizationError(e))
+        }
     }
 
     suspend fun disconnect() {
@@ -140,28 +237,37 @@ class DriveSyncManager @Inject constructor(
 
         if (api != null) {
             return when (api.statusCode) {
-                10 ->
-                    "Google OAuth rejected this installed build (status 10 / DEVELOPER_ERROR). " +
-                        "Create or fix an Android OAuth client with ${oauthIdentitySummary()}, " +
-                        "enable Google Drive API, and include drive.appdata on the OAuth consent screen."
+                CommonStatusCodes.DEVELOPER_ERROR ->
+                    "Google OAuth rejected this installed build " +
+                        "(10: DEVELOPER_ERROR). Create/fix an Android OAuth " +
+                        "client with ${oauthIdentitySummary()}, enable Google " +
+                        "Drive API, and grant the drive.appdata scope."
 
-                7 ->
+                CommonStatusCodes.INTERNAL_ERROR ->
+                    "Google Play services returned 8: INTERNAL_ERROR even " +
+                        "after automatic retries. Update/repair Google Play " +
+                        "services, confirm a Google account is signed in, " +
+                        "then retry. Also verify the Android OAuth client uses " +
+                        "exactly ${oauthIdentitySummary()} and Drive API is enabled."
+
+                CommonStatusCodes.NETWORK_ERROR ->
                     "Google authorization could not reach Google Play services. " +
-                        "Check connectivity, Google Play services, and try again."
+                        "Check connectivity and try again. ${oauthIdentitySummary()}"
 
-                16, 12501 ->
+                CommonStatusCodes.CANCELED, 12501 ->
                     "Google authorization was cancelled by the user."
 
                 else ->
                     "Google authorization failed " +
-                        "(${api.statusCode}: ${CommonStatusCodes.getStatusCodeString(api.statusCode)}). " +
+                        "(${api.statusCode}: " +
+                        "${CommonStatusCodes.getStatusCodeString(api.statusCode)}). " +
                         oauthIdentitySummary()
             }
         }
 
         return error.message
             ?.takeIf { it.isNotBlank() }
-            ?.take(300)
+            ?.take(360)
             ?: "Google Drive authorization failed. ${oauthIdentitySummary()}"
     }
 
@@ -182,7 +288,9 @@ class DriveSyncManager @Inject constructor(
                 settings.markSynced()
                 SyncResult.Success
             } catch (e: DriveAuthorizationExpired) {
-                settings.clearDrive()
+                // Drop only the short-lived token. Keep the grant state so
+                // syncCached() can silently request a fresh access token.
+                settings.clearDriveToken()
                 SyncResult.NeedsAuthorization
             } catch (e: CancellationException) {
                 throw e
@@ -202,7 +310,10 @@ class DriveSyncManager @Inject constructor(
             .host("www.googleapis.com")
             .addPathSegments("drive/v3/files")
             .addQueryParameter("spaces", "appDataFolder")
-            .addQueryParameter("q", "name='$SNAPSHOT_NAME' and trashed=false")
+            .addQueryParameter(
+                "q",
+                "name='$SNAPSHOT_NAME' and trashed=false"
+            )
             .addQueryParameter("orderBy", "modifiedTime desc")
             .addQueryParameter("pageSize", "1")
             .addQueryParameter("fields", "files(id,name,modifiedTime)")
@@ -330,27 +441,32 @@ class DriveSyncManager @Inject constructor(
     private fun signingSha1(): String {
         return runCatching {
             val signingFlags =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     PackageManager.GET_SIGNING_CERTIFICATES
-                else
+                } else {
                     PackageManager.GET_SIGNATURES
+                }
 
             val packageInfo = context.packageManager.getPackageInfo(
                 context.packageName,
                 signingFlags
             )
 
-            val signatureBytes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                val info = packageInfo.signingInfo
-                val signatures = if (info?.hasMultipleSigners() == true) {
-                    info.apkContentsSigners
+            val signatureBytes =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val info = packageInfo.signingInfo
+                    val signatures =
+                        if (info?.hasMultipleSigners() == true) {
+                            info.apkContentsSigners
+                        } else {
+                            info?.signingCertificateHistory
+                        }
+                    signatures?.firstOrNull()?.toByteArray()
                 } else {
-                    info?.signingCertificateHistory
-                }
-                signatures?.firstOrNull()?.toByteArray()
-            } else {
-                packageInfo.signatures?.firstOrNull()?.toByteArray()
-            } ?: return@runCatching "unavailable"
+                    packageInfo.signatures
+                        ?.firstOrNull()
+                        ?.toByteArray()
+                } ?: return@runCatching "unavailable"
 
             MessageDigest.getInstance("SHA-1")
                 .digest(signatureBytes)

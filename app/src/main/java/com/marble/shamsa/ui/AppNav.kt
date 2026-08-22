@@ -18,6 +18,7 @@ import com.marble.shamsa.core.model.Reminder
 import com.marble.shamsa.ui.categories.CategoriesScreen
 import com.marble.shamsa.ui.editor.ReminderEditorScreen
 import com.marble.shamsa.ui.home.HomeScreen
+import com.marble.shamsa.ui.notes.NotesScreen
 import com.marble.shamsa.ui.settings.SettingsScreen
 import com.marble.shamsa.ui.timeline.TimelineScreen
 import com.marble.shamsa.ui.viewmodel.MainViewModel
@@ -40,6 +41,7 @@ fun ShamsaAppNav(
     val nav = rememberNavController()
     val reminders by viewModel.reminders.collectAsState()
     val categories by viewModel.categories.collectAsState()
+    val notes by viewModel.notes.collectAsState()
     val query by viewModel.query.collectAsState()
     val filter by viewModel.filter.collectAsState()
     val sort by viewModel.sort.collectAsState()
@@ -47,6 +49,7 @@ fun ShamsaAppNav(
 
     val tabs = listOf(
         Tab("home", R.string.home, Icons.Rounded.Home),
+        Tab("notes", R.string.notes_tab, Icons.Rounded.EditNote),
         Tab("timeline", R.string.timeline, Icons.Rounded.CalendarMonth),
         Tab("categories", R.string.categories, Icons.Rounded.Category),
         Tab("settings", R.string.settings, Icons.Rounded.Settings)
@@ -68,7 +71,7 @@ fun ShamsaAppNav(
             if (route in tabs.map { it.route }) {
                 NavigationBar(
                     containerColor = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 3.dp
+                    tonalElevation = 2.dp
                 ) {
                     tabs.forEach { tab ->
                         NavigationBarItem(
@@ -84,8 +87,16 @@ fun ShamsaAppNav(
                                     restoreState = true
                                 }
                             },
-                            icon = { Icon(tab.icon, null) },
-                            label = { Text(stringResource(tab.label)) },
+                            icon = {
+                                Icon(
+                                    tab.icon,
+                                    null
+                                )
+                            },
+                            label = {
+                                Text(stringResource(tab.label))
+                            },
+                            alwaysShowLabel = false,
                             colors = NavigationBarItemDefaults.colors(
                                 indicatorColor =
                                     MaterialTheme.colorScheme.primaryContainer
@@ -102,10 +113,13 @@ fun ShamsaAppNav(
                     icon = { Icon(Icons.Rounded.Add, null) },
                     text = {
                         Text(
-                            if (persian) "یادآور جدید"
-                            else "New reminder"
+                            if (persian)
+                                "یادآور جدید"
+                            else
+                                "New reminder"
                         )
-                    }
+                    },
+                    shape = MaterialTheme.shapes.extraLarge
                 )
             }
         }
@@ -115,11 +129,11 @@ fun ShamsaAppNav(
             startDestination = "home",
             modifier = Modifier.padding(padding),
             enterTransition = {
-                fadeIn() + slideInHorizontally { it / 9 }
+                fadeIn() + slideInHorizontally { it / 10 }
             },
             exitTransition = { fadeOut() },
             popEnterTransition = {
-                fadeIn() + slideInHorizontally { -it / 9 }
+                fadeIn() + slideInHorizontally { -it / 10 }
             }
         ) {
             composable("home") {
@@ -138,6 +152,15 @@ fun ShamsaAppNav(
                     onComplete = viewModel::complete,
                     onCancel = viewModel::cancel,
                     onDelete = viewModel::delete
+                )
+            }
+
+            composable("notes") {
+                NotesScreen(
+                    notes = notes,
+                    persian = persian,
+                    onSave = viewModel::saveNote,
+                    onDelete = viewModel::deleteNote
                 )
             }
 

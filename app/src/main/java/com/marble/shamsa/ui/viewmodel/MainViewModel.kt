@@ -35,11 +35,19 @@ class MainViewModel @Inject constructor(
         SharingStarted.WhileSubscribed(5000),
         emptyList()
     )
+
     val categories = repository.categories.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
         emptyList()
     )
+
+    val notes = repository.notes.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        emptyList()
+    )
+
     val settings = settingsStore.settings.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
@@ -99,7 +107,15 @@ class MainViewModel @Inject constructor(
     fun saveCategory(v: Category) =
         viewModelScope.launch { repository.saveCategory(v) }
 
+    fun saveNote(v: Note) =
+        viewModelScope.launch { repository.saveNote(v) }
+
+    fun deleteNote(id: String) =
+        viewModelScope.launch { repository.deleteNote(id) }
+
     suspend fun getReminder(id: String) = repository.get(id)
+
+    suspend fun getNote(id: String) = repository.getNote(id)
 
     fun setLanguage(v: String) =
         viewModelScope.launch { settingsStore.setLanguage(v) }
@@ -117,7 +133,9 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { settingsStore.setPopup(v) }
 
     fun finishOnboarding() =
-        viewModelScope.launch { settingsStore.setOnboardingComplete(true) }
+        viewModelScope.launch {
+            settingsStore.setOnboardingComplete(true)
+        }
 
     fun driveAuthorizationStarted() {
         _driveUi.value = driveState(working = true)
@@ -135,16 +153,22 @@ class MainViewModel @Inject constructor(
         )
     }
 
-    suspend fun beginDriveAuthorization(activity: Activity): AuthorizationResult =
+    suspend fun beginDriveAuthorization(
+        activity: Activity
+    ): AuthorizationResult =
         drive.beginAuthorization(activity)
 
-    fun authorizationFromIntent(activity: Activity, data: Intent?): AuthorizationResult? =
+    fun authorizationFromIntent(
+        activity: Activity,
+        data: Intent?
+    ): AuthorizationResult? =
         drive.authorizationFromIntent(activity, data)
 
-    fun acceptAuthorization(result: AuthorizationResult) = viewModelScope.launch {
-        _driveUi.value = driveState(working = true)
-        presentDriveResult(drive.acceptAuthorization(result))
-    }
+    fun acceptAuthorization(result: AuthorizationResult) =
+        viewModelScope.launch {
+            _driveUi.value = driveState(working = true)
+            presentDriveResult(drive.acceptAuthorization(result))
+        }
 
     fun syncNow() = viewModelScope.launch {
         _driveUi.value = driveState(working = true)
@@ -172,7 +196,7 @@ class MainViewModel @Inject constructor(
         _syncState.value = result
         _driveUi.value = when (result) {
             SyncResult.Success -> driveState(
-                message = "Google Drive is connected and your reminders are synced.",
+                message = "Google Drive is connected; reminders and notes are synced.",
                 successful = true
             )
 
@@ -180,7 +204,9 @@ class MainViewModel @Inject constructor(
                 message = "Google Drive authorization is required. Tap Connect / Reconnect."
             )
 
-            is SyncResult.Failure -> driveState(message = result.message)
+            is SyncResult.Failure -> driveState(
+                message = result.message
+            )
         }
     }
 }

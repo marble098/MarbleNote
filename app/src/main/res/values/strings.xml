@@ -5,6 +5,7 @@
     <string name="notification_channel_reminders_desc">Due reminders and countdown alerts</string>
     <string name="notification_channel_sync">Cloud sync</string>
     <string name="home">Home</string>
+    <string name="notes_tab">Notes</string>
     <string name="timeline">Timeline</string>
     <string name="categories">Categories</string>
     <string name="settings">Settings</string>
@@ -33,7 +34,7 @@
     <string name="sync_now">Sync now</string>
     <string name="permissions">Reminder permissions</string>
     <string name="onboarding_welcome">Your time, in reverse.</string>
-    <string name="onboarding_subtitle">Solar-calendar reminders with beautiful countdowns and private Drive backup.</string>
+    <string name="onboarding_subtitle">Solar-calendar reminders, quick notes, beautiful countdowns and private Drive backup.</string>
     <string name="continue_label">Continue</string>
     <string name="get_started">Start Shamsa</string>
     <string name="choose_language">Choose your language</string>
@@ -41,7 +42,7 @@
     <string name="allow_notifications">Allow notifications</string>
     <string name="allow_exact_alarms">Allow exact alarms</string>
     <string name="allow_fullscreen">Allow full-screen reminders</string>
-    <string name="cloud_explain">Connect Drive to restore reminders after reinstalling the app.</string>
+    <string name="cloud_explain">Connect Drive to restore reminders and notes after reinstalling the app.</string>
     <string name="skip">Skip for now</string>
     <string name="filter_all">All</string>
     <string name="filter_today">Today</string>
