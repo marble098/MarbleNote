@@ -292,6 +292,7 @@ private fun NoteCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NoteEditorPage(
     note: Note?,
