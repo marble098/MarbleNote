@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
-    <exclude domain="database" path="shamsa.db" />
-    <exclude domain="sharedpref" path="drive_token.xml" />
+    <!--
+      V6 fallback: reminders, notes and categories live in shamsa.db.
+      Keep the database eligible for Android/Google cloud backup so a
+      reinstall has a second recovery path even when Drive OAuth is down.
+
+      Do not back up DataStore because it contains the short-lived Drive
+      access token and device-local preferences.
+    -->
+    <include domain="database" path="shamsa.db" />
 </full-backup-content>

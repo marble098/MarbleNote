@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
-        <exclude domain="database" path="shamsa.db" />
+        <!-- Database-only cloud backup: no OAuth token or device-local settings. -->
+        <include domain="database" path="shamsa.db" />
     </cloud-backup>
+
     <device-transfer>
-        <include domain="root" path="." />
+        <!-- Carry user content during phone-to-phone transfer too. -->
+        <include domain="database" path="shamsa.db" />
     </device-transfer>
 </data-extraction-rules>
