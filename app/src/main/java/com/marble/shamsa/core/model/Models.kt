@@ -2,8 +2,6 @@ package com.marble.shamsa.core.model
 
 import kotlinx.serialization.Serializable
 
-// SHAMSA_FEATURE_PACK_V5_NOTES_DRIVE
-
 @Serializable
 enum class ReminderStatus { ACTIVE, COMPLETED, CANCELED }
 
@@ -60,6 +58,7 @@ data class Note(
     val body: String = "",
     val colorArgb: Long = 0xFFFFE082,
     val pinned: Boolean = false,
+    val sortOrder: Long = 0L,
     val createdAtMillis: Long,
     val updatedAtMillis: Long,
     val deletedAtMillis: Long? = null
@@ -67,11 +66,10 @@ data class Note(
 
 @Serializable
 data class CloudSnapshot(
-    val schemaVersion: Int = 2,
+    val schemaVersion: Int = 3,
     val generatedAtMillis: Long,
     val deviceId: String,
     val reminders: List<Reminder>,
     val categories: List<Category>,
-    // Default keeps v1 Drive snapshots fully backward compatible.
     val notes: List<Note> = emptyList()
 )

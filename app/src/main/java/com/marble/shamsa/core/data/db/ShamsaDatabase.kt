@@ -9,7 +9,7 @@ import androidx.room.RoomDatabase
         CategoryEntity::class,
         NoteEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class ShamsaDatabase : RoomDatabase() {

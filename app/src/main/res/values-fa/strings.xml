@@ -33,8 +33,8 @@
     <string name="drive_connect">اتصال گوگل درایو</string>
     <string name="sync_now">همگام‌سازی</string>
     <string name="permissions">مجوزهای یادآوری</string>
-    <string name="onboarding_welcome">زمانت را برعکس ببین.</string>
-    <string name="onboarding_subtitle">یادآورهای شمسی، یادداشت‌های سریع، شمارش‌معکوس زیبا و پشتیبان امن درایو.</string>
+    <string name="onboarding_welcome">برنامه‌ریزیِ زمان، با آرامش بیشتر.</string>
+    <string name="onboarding_subtitle">یادآورهای شمسی، صفحه‌های خلوت‌تر، نمایش بهتر زمان باقی‌مانده، یادداشت‌های مارک‌داون و پشتیبان امن درایو.</string>
     <string name="continue_label">ادامه</string>
     <string name="get_started">شروع شمسا</string>
     <string name="choose_language">زبان را انتخاب کن</string>

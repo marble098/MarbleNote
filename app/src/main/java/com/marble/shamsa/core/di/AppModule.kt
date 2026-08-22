@@ -38,6 +38,23 @@ object AppModule {
         }
     }
 
+    private val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE `notes` ADD COLUMN `sortOrder` INTEGER NOT NULL DEFAULT 0"
+            )
+            db.execSQL(
+                """
+                UPDATE `notes`
+                SET `sortOrder` = CASE
+                    WHEN `createdAtMillis` > 0 THEN `createdAtMillis`
+                    ELSE CAST(rowid AS INTEGER)
+                END
+                """.trimIndent()
+            )
+        }
+    }
+
     @Provides
     @Singleton
     fun database(@ApplicationContext context: Context): ShamsaDatabase =
@@ -46,7 +63,7 @@ object AppModule {
             ShamsaDatabase::class.java,
             "shamsa.db"
         )
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
 
     @Provides

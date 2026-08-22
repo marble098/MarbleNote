@@ -94,13 +94,32 @@ class ReminderRepository @Inject constructor(
 
     suspend fun saveNote(value: Note) {
         val now = System.currentTimeMillis()
+        val currentMax = noteDao.maxSortOrder()
         val normalized = value.copy(
             id = value.id.ifBlank { UUID.randomUUID().toString() },
+            sortOrder = value.sortOrder.takeIf { it > 0 } ?: (currentMax + 1L),
             createdAtMillis = value.createdAtMillis.takeIf { it > 0 } ?: now,
             updatedAtMillis = now,
             deletedAtMillis = null
         )
         noteDao.upsert(NoteEntity.fromModel(normalized))
+        work.enqueueCloudSync()
+    }
+
+    suspend fun moveNote(id: String, direction: Int) = db.withTransaction {
+        if (direction == 0) return@withTransaction
+        val ordered = noteDao.orderedActive()
+        val index = ordered.indexOfFirst { it.id == id }
+        if (index == -1) return@withTransaction
+        val target = (index + direction).coerceIn(0, ordered.lastIndex)
+        if (target == index) return@withTransaction
+
+        val a = ordered[index]
+        val b = ordered[target]
+        val now = System.currentTimeMillis()
+
+        noteDao.updateSortOrder(a.id, b.sortOrder, now)
+        noteDao.updateSortOrder(b.id, a.sortOrder, now)
         work.enqueueCloudSync()
     }
 
@@ -163,7 +182,10 @@ class ReminderRepository @Inject constructor(
         val mergedNotes = snapshot.notes.mapNotNull { remote ->
             val local = localNotes[remote.id]?.toModel()
             if (local == null || remote.updatedAtMillis > local.updatedAtMillis) {
-                NoteEntity.fromModel(remote)
+                val normalized = remote.copy(
+                    sortOrder = remote.sortOrder.takeIf { it > 0 } ?: remote.createdAtMillis
+                )
+                NoteEntity.fromModel(normalized)
             } else {
                 null
             }

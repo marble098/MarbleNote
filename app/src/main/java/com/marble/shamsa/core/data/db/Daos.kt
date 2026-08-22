@@ -41,14 +41,23 @@ interface CategoryDao {
 
 @Dao
 interface NoteDao {
-    @Query("SELECT * FROM notes WHERE deletedAtMillis IS NULL ORDER BY pinned DESC, updatedAtMillis DESC")
+    @Query("SELECT * FROM notes WHERE deletedAtMillis IS NULL ORDER BY pinned DESC, sortOrder ASC, updatedAtMillis DESC")
     fun observeAll(): Flow<List<NoteEntity>>
 
     @Query("SELECT * FROM notes")
     suspend fun allForSync(): List<NoteEntity>
 
+    @Query("SELECT * FROM notes WHERE deletedAtMillis IS NULL ORDER BY pinned DESC, sortOrder ASC, updatedAtMillis DESC")
+    suspend fun orderedActive(): List<NoteEntity>
+
     @Query("SELECT * FROM notes WHERE id = :id LIMIT 1")
     suspend fun byId(id: String): NoteEntity?
+
+    @Query("SELECT COALESCE(MAX(sortOrder), 0) FROM notes")
+    suspend fun maxSortOrder(): Long
+
+    @Query("UPDATE notes SET sortOrder = :sortOrder, updatedAtMillis = :updatedAtMillis WHERE id = :id")
+    suspend fun updateSortOrder(id: String, sortOrder: Long, updatedAtMillis: Long)
 
     @Upsert
     suspend fun upsert(entity: NoteEntity)

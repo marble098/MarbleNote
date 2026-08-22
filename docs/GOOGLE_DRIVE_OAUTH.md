@@ -1,51 +1,43 @@
-# Shamsa — Google Drive OAuth and restore
+# Shamsa — Google Drive OAuth setup
 
-Shamsa uses Google Identity Services `AuthorizationClient` with the private
-Google Drive `appDataFolder` scope.
+Shamsa uses Google Identity Services `AuthorizationClient` and stores its backup inside the private Drive **appDataFolder**.
 
-## Release identity
+## Runtime app identity
 
-- Android package: `com.marble.shamsa`
-- Release SHA-1:
-  `EA:92:C9:39:1A:B9:31:B7:5A:EB:F5:DC:48:F3:69:9E:66:B2:58:83`
-- Scope: `https://www.googleapis.com/auth/drive.appdata`
-- Google Play services auth library: `21.5.0+`
+- Package: `com.marble.shamsa`
+- Signing SHA-1: read it from the in-app Drive diagnostics card
 
-The release SHA-1 comes from the persistent GitHub Actions signing key and is
-also stored in `.github/signing/release-cert-sha1.txt`.
+## Google Cloud items to verify
 
-## Required Google Cloud configuration
+1. Create or open the correct Google Cloud project.
+2. Enable **Google Drive API** in that project.
+3. Create an **Android OAuth client** for:
+   - package name `com.marble.shamsa`
+   - the exact SHA-1 of the installed build
+4. If the Android client already exists, make sure it belongs to the same project where Drive API is enabled.
+5. Install/update **Google Play services** on the device and sign in to at least one Google account.
 
-All of these must belong to the same Google Cloud project:
+## Optional values captured when running the cloud patch
 
-1. Google Drive API is enabled.
-2. The OAuth consent screen / Google Auth Platform data access includes
-   `https://www.googleapis.com/auth/drive.appdata`.
-3. An Android OAuth client exists with:
-   - package `com.marble.shamsa`
-   - SHA-1 `EA:92:C9:39:1A:B9:31:B7:5A:EB:F5:DC:48:F3:69:9E:66:B2:58:83`
-4. If the app audience is in Testing, the account used on the phone is an
-   allowed test user.
-5. If Play App Signing is introduced later, its app-signing SHA-1 must be
-   registered as an additional Android OAuth client.
+- Project ID / name: `(not provided)`
+- Android OAuth client ID: `(not provided)`
 
-No client secret should be embedded in the Android application.
+## Why INTERNAL_ERROR or DEVELOPER_ERROR can happen
 
-## Runtime error meanings
+- **DEVELOPER_ERROR / status 10**
+  - package/SHA-1 mismatch
+  - wrong Google Cloud project
+  - Drive API not enabled
+- **INTERNAL_ERROR / status 8**
+  - Google Play services issue
+  - Google account state issue
+  - transient Play services failure
+  - wrong Android OAuth configuration can still surface as an internal failure on some devices
 
-- `8: INTERNAL_ERROR` is emitted by Google Play services as an internal error.
-  Shamsa retries and offers an authorization reset. If it remains reproducible,
-  inspect Play services and the Cloud configuration above.
-- `10: DEVELOPER_ERROR` means the application is misconfigured, normally an
-  Android OAuth identity mismatch.
+## What this v7 patch improves
 
-## Second restore layer
-
-Shamsa v6 also allows `shamsa.db` to participate in Android/Google cloud backup
-and device transfer. The app DataStore is intentionally not included, because
-it contains the short-lived Drive access token and device-local settings.
-
-This second layer does not replace Drive sync and is subject to the user's
-Android backup settings and the device/OEM backup transport. It does make
-reminders, notes and categories eligible for restore after reinstall when the
-system backup service is enabled.
+- clearer Drive diagnostics
+- stronger bilingual user-facing error text
+- better restore guidance for reinstall scenarios
+- Markdown notes are included in Drive snapshots
+- note ordering is preserved in cloud backups too

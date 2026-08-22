@@ -88,18 +88,14 @@ fun ShamsaAppNav(
                                 }
                             },
                             icon = {
-                                Icon(
-                                    tab.icon,
-                                    null
-                                )
+                                Icon(tab.icon, null)
                             },
                             label = {
                                 Text(stringResource(tab.label))
                             },
                             alwaysShowLabel = false,
                             colors = NavigationBarItemDefaults.colors(
-                                indicatorColor =
-                                    MaterialTheme.colorScheme.primaryContainer
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer
                             )
                         )
                     }
@@ -113,10 +109,7 @@ fun ShamsaAppNav(
                     icon = { Icon(Icons.Rounded.Add, null) },
                     text = {
                         Text(
-                            if (persian)
-                                "یادآور جدید"
-                            else
-                                "New reminder"
+                            if (persian) "یادآور جدید" else "New reminder"
                         )
                     },
                     shape = MaterialTheme.shapes.extraLarge
@@ -160,15 +153,14 @@ fun ShamsaAppNav(
                     notes = notes,
                     persian = persian,
                     onSave = viewModel::saveNote,
-                    onDelete = viewModel::deleteNote
+                    onDelete = viewModel::deleteNote,
+                    onMoveUp = viewModel::moveNoteUp,
+                    onMoveDown = viewModel::moveNoteDown
                 )
             }
 
             composable("timeline") {
-                TimelineScreen(
-                    reminders,
-                    persian
-                ) {
+                TimelineScreen(reminders, persian) {
                     nav.navigate("edit/$it")
                 }
             }

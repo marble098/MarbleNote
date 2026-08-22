@@ -2,150 +2,152 @@ package com.marble.shamsa.core.time
 
 import kotlin.math.abs
 
-data class CountdownParts(
-    val days: Long,
-    val hours: Long,
-    val minutes: Long,
-    val seconds: Long,
-    val overdue: Boolean
-)
-
 object CountdownFormatter {
-    fun parts(dueAtMillis: Long, nowMillis: Long = System.currentTimeMillis()): CountdownParts {
-        val rawMillis = dueAtMillis - nowMillis
-        var total = abs(rawMillis) / 1000L
-        val overdue = rawMillis < 0L
-        val days = total / 86_400
-        total %= 86_400
-        val hours = total / 3_600
-        total %= 3_600
-        val minutes = total / 60
-        val seconds = total % 60
-        return CountdownParts(days, hours, minutes, seconds, overdue)
+    private data class Parts(
+        val overdue: Boolean,
+        val days: Long,
+        val hours: Long,
+        val minutes: Long,
+        val seconds: Long
+    )
+
+    private fun parts(dueAtMillis: Long, now: Long): Parts {
+        val overdue = dueAtMillis < now
+        var remaining = abs(dueAtMillis - now) / 1000L
+        val days = remaining / 86400L
+        remaining %= 86400L
+        val hours = remaining / 3600L
+        remaining %= 3600L
+        val minutes = remaining / 60L
+        val seconds = remaining % 60L
+        return Parts(overdue, days, hours, minutes, seconds)
     }
 
-    fun compact(
-        dueAtMillis: Long,
-        nowMillis: Long = System.currentTimeMillis(),
-        persian: Boolean = false
-    ): String {
-        val p = parts(dueAtMillis, nowMillis)
-        val body = when {
-            p.days > 0 -> if (persian) "${p.days} روز ${p.hours} ساعت" else "${p.days}d ${p.hours}h"
-            p.hours > 0 -> if (persian) "${p.hours} ساعت ${p.minutes} دقیقه" else "${p.hours}h ${p.minutes}m"
-            else -> "%02d:%02d".format(p.minutes, p.seconds)
-        }
-        return localized(
-            if (p.overdue) {
-                if (persian) "$body گذشته" else "$body ago"
-            } else body,
-            persian
-        )
-    }
+    private fun digits(value: Long, persian: Boolean): String =
+        digits(value.toString(), persian)
 
-    fun digital(
-        dueAtMillis: Long,
-        nowMillis: Long = System.currentTimeMillis(),
-        persian: Boolean = false
-    ): String {
-        val p = parts(dueAtMillis, nowMillis)
-        val body = if (p.days > 0) {
-            "%02d:%02d:%02d:%02d".format(p.days, p.hours, p.minutes, p.seconds)
-        } else {
-            "%02d:%02d:%02d".format(p.hours, p.minutes, p.seconds)
-        }
-        return localized(if (p.overdue) "− $body" else body, persian)
-    }
-
-    fun digitalLegend(
-        dueAtMillis: Long,
-        nowMillis: Long = System.currentTimeMillis(),
-        persian: Boolean = false
-    ): String {
-        val p = parts(dueAtMillis, nowMillis)
-        return if (p.days > 0) {
-            if (persian) "روز : ساعت : دقیقه : ثانیه" else "DAY : HOUR : MIN : SEC"
-        } else {
-            if (persian) "ساعت : دقیقه : ثانیه" else "HOUR : MIN : SEC"
-        }
-    }
-
-    fun segments(
-        dueAtMillis: Long,
-        nowMillis: Long = System.currentTimeMillis(),
-        persian: Boolean = false
-    ): String {
-        val p = parts(dueAtMillis, nowMillis)
-        val body = if (persian) {
-            "${pad(p.days)}ر • ${pad(p.hours)}س • ${pad(p.minutes)}د • ${pad(p.seconds)}ث"
-        } else {
-            "${pad(p.days)}d • ${pad(p.hours)}h • ${pad(p.minutes)}m • ${pad(p.seconds)}s"
-        }
-        return localized(if (p.overdue) "− $body" else body, persian)
-    }
-
-    fun focusPrimary(
-        dueAtMillis: Long,
-        nowMillis: Long = System.currentTimeMillis(),
-        persian: Boolean = false
-    ): String {
-        val p = parts(dueAtMillis, nowMillis)
-        val text = when {
-            p.days > 0 -> if (persian) "${p.days} روز" else "${p.days} days"
-            p.hours > 0 -> if (persian) "${p.hours} ساعت" else "${p.hours} hours"
-            p.minutes > 0 -> if (persian) "${p.minutes} دقیقه" else "${p.minutes} min"
-            else -> if (persian) "${p.seconds} ثانیه" else "${p.seconds} sec"
-        }
-        return localized(if (p.overdue) "− $text" else text, persian)
-    }
-
-    fun focusSecondary(
-        dueAtMillis: Long,
-        nowMillis: Long = System.currentTimeMillis(),
-        persian: Boolean = false
-    ): String {
-        val p = parts(dueAtMillis, nowMillis)
-        val body = when {
-            p.days > 0 ->
-                if (persian) "${pad(p.hours)} ساعت • ${pad(p.minutes)} دقیقه • ${pad(p.seconds)} ثانیه"
-                else "${pad(p.hours)}h • ${pad(p.minutes)}m • ${pad(p.seconds)}s"
-            p.hours > 0 ->
-                if (persian) "${pad(p.minutes)} دقیقه • ${pad(p.seconds)} ثانیه"
-                else "${pad(p.minutes)}m • ${pad(p.seconds)}s"
-            else -> if (persian) "${pad(p.seconds)} ثانیه" else "${pad(p.seconds)}s"
-        }
-        return localized(
-            if (p.overdue) {
-                if (persian) "$body از موعد گذشته" else "$body overdue"
-            } else body,
-            persian
-        )
-    }
-
-    fun unitValues(
-        dueAtMillis: Long,
-        nowMillis: Long = System.currentTimeMillis(),
-        persian: Boolean = false
-    ): List<String> {
-        val p = parts(dueAtMillis, nowMillis)
-        return listOf(p.days, p.hours, p.minutes, p.seconds)
-            .map { localized(pad(it), persian) }
-    }
-
-    fun unitLabels(persian: Boolean): List<String> =
-        if (persian) listOf("روز", "ساعت", "دقیقه", "ثانیه")
-        else listOf("DAYS", "HRS", "MIN", "SEC")
-
-    private fun pad(value: Long): String = value.toString().padStart(2, '0')
-
-    private fun localized(value: String, persian: Boolean): String {
+    private fun digits(value: String, persian: Boolean): String {
         if (!persian) return value
-        val en = "0123456789"
-        val fa = "۰۱۲۳۴۵۶۷۸۹"
-        return buildString(value.length) {
-            value.forEach { ch ->
-                val index = en.indexOf(ch)
-                append(if (index >= 0) fa[index] else ch)
+        val fa = charArrayOf('۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹')
+        val out = StringBuilder(value.length)
+        value.forEach { ch ->
+            if (ch in '0'..'9') out.append(fa[ch - '0']) else out.append(ch)
+        }
+        return out.toString()
+    }
+
+    private fun pad2(value: Long, persian: Boolean): String =
+        digits(value.toString().padStart(2, '0'), persian)
+
+    private fun unit(value: Long, persian: Boolean, fa: String, en: String): String =
+        if (persian) "${digits(value, true)} $fa" else "${digits(value, false)} $en"
+
+    private fun overdueLabel(persian: Boolean): String =
+        if (persian) "گذشته" else "Overdue"
+
+    private fun leftLabel(persian: Boolean): String =
+        if (persian) "مانده" else "left"
+
+    fun compact(dueAtMillis: Long, now: Long, persian: Boolean): String {
+        val p = parts(dueAtMillis, now)
+        if (p.overdue) return overdueLabel(persian)
+        return when {
+            p.days > 0 ->
+                if (persian) {
+                    "${unit(p.days, true, "روز", "day")} و ${unit(p.hours, true, "ساعت", "h")}"
+                } else {
+                    "${digits(p.days, false)}d ${digits(p.hours, false)}h"
+                }
+
+            p.hours > 0 ->
+                if (persian) {
+                    "${unit(p.hours, true, "ساعت", "h")} و ${unit(p.minutes, true, "دقیقه", "m")}"
+                } else {
+                    "${digits(p.hours, false)}h ${digits(p.minutes, false)}m"
+                }
+
+            p.minutes > 0 ->
+                if (persian) {
+                    "${unit(p.minutes, true, "دقیقه", "m")} و ${unit(p.seconds, true, "ثانیه", "s")}"
+                } else {
+                    "${digits(p.minutes, false)}m ${digits(p.seconds, false)}s"
+                }
+
+            else ->
+                unit(p.seconds, persian, "ثانیه", "s")
+        }
+    }
+
+    fun digital(dueAtMillis: Long, now: Long, persian: Boolean): String {
+        val p = parts(dueAtMillis, now)
+        if (p.overdue) return overdueLabel(persian)
+
+        return if (p.days > 0) {
+            if (persian) {
+                "${digits(p.days, true)} روز • ${pad2(p.hours, true)}:${pad2(p.minutes, true)}"
+            } else {
+                "${digits(p.days, false)}d • ${pad2(p.hours, false)}:${pad2(p.minutes, false)}"
+            }
+        } else {
+            "${pad2(p.hours, persian)}:${pad2(p.minutes, persian)}:${pad2(p.seconds, persian)}"
+        }
+    }
+
+    fun segments(dueAtMillis: Long, now: Long, persian: Boolean): String {
+        val p = parts(dueAtMillis, now)
+        if (p.overdue) return overdueLabel(persian)
+
+        val items = buildList {
+            if (p.days > 0) add(unit(p.days, persian, "روز", "days"))
+            if (p.hours > 0) add(unit(p.hours, persian, "ساعت", "hr"))
+            if (p.minutes > 0) add(unit(p.minutes, persian, "دقیقه", "min"))
+            if (p.seconds > 0 && size < 3) add(unit(p.seconds, persian, "ثانیه", "sec"))
+        }
+
+        return if (items.isEmpty()) {
+            if (persian) "همین حالا" else "Now"
+        } else {
+            items.take(3).joinToString(" • ")
+        }
+    }
+
+    fun focusPrimary(dueAtMillis: Long, now: Long, persian: Boolean): String {
+        val p = parts(dueAtMillis, now)
+        if (p.overdue) return overdueLabel(persian)
+        return when {
+            p.days > 0 -> unit(p.days, persian, "روز", "days")
+            p.hours > 0 -> unit(p.hours, persian, "ساعت", "hours")
+            p.minutes > 0 -> unit(p.minutes, persian, "دقیقه", "minutes")
+            else -> unit(p.seconds, persian, "ثانیه", "seconds")
+        }
+    }
+
+    fun focusSecondary(dueAtMillis: Long, now: Long, persian: Boolean): String {
+        val p = parts(dueAtMillis, now)
+        if (p.overdue) return overdueLabel(persian)
+
+        val detail = when {
+            p.days > 0 -> listOf(
+                unit(p.hours, persian, "ساعت", "hr"),
+                unit(p.minutes, persian, "دقیقه", "min")
+            )
+            p.hours > 0 -> listOf(
+                unit(p.minutes, persian, "دقیقه", "min"),
+                unit(p.seconds, persian, "ثانیه", "sec")
+            )
+            p.minutes > 0 -> listOf(
+                unit(p.seconds, persian, "ثانیه", "sec")
+            )
+            else -> emptyList()
+        }.filter { !it.startsWith("0") && !it.startsWith("۰") }
+
+        return if (detail.isEmpty()) {
+            if (persian) "به‌زودی" else "Soon"
+        } else {
+            if (persian) {
+                detail.joinToString(" • ") + " " + leftLabel(true)
+            } else {
+                detail.joinToString(" • ") + " " + leftLabel(false)
             }
         }
     }

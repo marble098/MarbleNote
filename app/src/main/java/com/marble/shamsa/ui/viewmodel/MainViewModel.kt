@@ -110,6 +110,12 @@ class MainViewModel @Inject constructor(
     fun saveNote(v: Note) =
         viewModelScope.launch { repository.saveNote(v) }
 
+    fun moveNoteUp(id: String) =
+        viewModelScope.launch { repository.moveNote(id, -1) }
+
+    fun moveNoteDown(id: String) =
+        viewModelScope.launch { repository.moveNote(id, 1) }
+
     fun deleteNote(id: String) =
         viewModelScope.launch { repository.deleteNote(id) }
 

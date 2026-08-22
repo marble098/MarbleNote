@@ -66,6 +66,7 @@ data class NoteEntity(
     val body: String,
     val colorArgb: Long,
     val pinned: Boolean,
+    val sortOrder: Long,
     val createdAtMillis: Long,
     val updatedAtMillis: Long,
     val deletedAtMillis: Long?
@@ -76,6 +77,7 @@ data class NoteEntity(
         body = body,
         colorArgb = colorArgb,
         pinned = pinned,
+        sortOrder = sortOrder,
         createdAtMillis = createdAtMillis,
         updatedAtMillis = updatedAtMillis,
         deletedAtMillis = deletedAtMillis
@@ -88,6 +90,7 @@ data class NoteEntity(
             body = v.body,
             colorArgb = v.colorArgb,
             pinned = v.pinned,
+            sortOrder = v.sortOrder,
             createdAtMillis = v.createdAtMillis,
             updatedAtMillis = v.updatedAtMillis,
             deletedAtMillis = v.deletedAtMillis

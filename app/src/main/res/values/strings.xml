@@ -33,8 +33,8 @@
     <string name="drive_connect">Connect Google Drive</string>
     <string name="sync_now">Sync now</string>
     <string name="permissions">Reminder permissions</string>
-    <string name="onboarding_welcome">Your time, in reverse.</string>
-    <string name="onboarding_subtitle">Solar-calendar reminders, quick notes, beautiful countdowns and private Drive backup.</string>
+    <string name="onboarding_welcome">Plan your time with less noise.</string>
+    <string name="onboarding_subtitle">Solar-calendar reminders, lighter screens, better countdowns, Markdown notes and private Drive backup.</string>
     <string name="continue_label">Continue</string>
     <string name="get_started">Start Shamsa</string>
     <string name="choose_language">Choose your language</string>
